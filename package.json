@@ -20,6 +20,7 @@
     "publish-project:dev": "tsx tools/publish.ts",
     "seed:demo": "node dist/tools/publish.js seed --demo-dir demo",
     "selftest": "node dist/tools/selftest.js",
+    "check:public": "node tools/public-check.mjs",
     "verify": "npm run build && npm run selftest"
   },
   "dependencies": {

@@ -23,6 +23,8 @@ tar -czf "$TARGET" \
   --exclude='./data-*' \
   --exclude='./.git' \
   --exclude='./ops' \
+  --exclude='./artifacts' \
+  --exclude='./publish-staging' \
   --exclude='./.env' \
   --exclude='*.tgz' \
   --exclude='*.sha256' \
@@ -44,7 +46,8 @@ echo "SHA-256：$SHA"
 echo "顶层目录：$NAME"
 echo
 echo "包含的关键路径："
-for key in package.json package-lock.json server/index.ts src/App.tsx tools/publish.ts \
+for key in package.json package-lock.json server/index.ts server/routes/admin.ts src/App.tsx src/admin/AdminApp.tsx \
+           admin.html tools/publish.ts tools/admin.ts tools/lib/media.ts \
            deploy/deploy.sh deploy/fennec-share.service deploy/backup.sh \
            demo/packages/paper-notes-web-1.0.0.zip docs/DEPLOYMENT.md README.md; do
   if [ "$(printf '%s\n' "$LIST" | grep -c "/$key\$" || true)" -gt 0 ]; then

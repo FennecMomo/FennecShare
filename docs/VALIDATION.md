@@ -157,7 +157,28 @@ Cloudflare Zero Trust → Tunnels → `personal` → Public Hostname 新增
 集成自测扩到 **48 项**（新增管理接口 13 项），浏览器验收扩到 **25 项**（新增分享 2 项、管理页面 3 项），
 全部通过。管理页面的浏览器用例只在设置了 `ADMIN_PASSWORD` 环境变量时运行，仓库里不存密码。
 
-## 八、没有验证 / 明确不支持的部分
+## 八、公网端到端验证（2026-10-18 22:25 CST）
+
+`share.fennecmomo.top` 的隧道路由与 DNS 生效后，用真实浏览器（Edge）从公网跑了一遍
+`npm run check:public`：
+
+| 检查 | 结果 |
+| --- | --- |
+| HTTPS 首页 | 200，证书正常，卡片渲染完整 |
+| 分享按钮 | 复制出 `https://share.fennecmomo.top/?p=qs1-repair-desk-deepseek` |
+| 分享链接 | 打开 `/?p=paper-notes` 自动弹出「便签纸」，`Esc` 后地址栏参数被清掉 |
+| 试玩页 | `/play/paper-notes/` → 302 → 版本目录 200 |
+| 管理页登录 | `/admin` 200，密码登录后读到 9 个项目（含 2 个下架） |
+| 会话 cookie | `HttpOnly` + `Secure`（HTTPS 下）+ `SameSite=Strict` |
+| 退出登录 | `/api/admin/session` 立刻回到 `authenticated: false` |
+
+同一次部署里服务器侧的观测：进程从 2336123 换成 2357217（SIGTERM 优雅退出 → 新进程启动），
+`catalogRevision` 保持 19（部署不动数据），四个 `/play` 与 paper-notes 下载均正常，
+`auth.json` 权限 600、属主 ubuntu、哈希与本地生成的一致。
+
+> 这轮验证没有修改任何项目数据：管理页只做了登录、读列表、退出。
+
+## 九、没有验证 / 明确不支持的部分
 
 | 项 | 说明 |
 | --- | --- |

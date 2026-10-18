@@ -96,6 +96,11 @@ DATA_DIR=/home/ubuntu/fennec-share-data PUBLIC_BASE_URL=https://share.fennecmomo
 注意：本机 `/etc/cloudflared/config.yml` 是过时的，真正的 ingress 由仪表盘远程下发，
 改本地文件没用。
 
+**当前状态（2026-10-18 22:20 CST 起）**：这条 ingress 与 DNS **已经生效**，
+`https://share.fennecmomo.top/` 实测 200。它是由仪表盘侧添加的（隧道路由 + 2 条 A 记录），
+不是本机改配置文件，也没有重启 cloudflared。如果以后要撤掉，反着做一遍即可，应用侧不受影响。
+
+
 如果以后改用 Caddy/Nginx 反代，只需要把 `https://share.fennecmomo.top` 反代到
 `http://127.0.0.1:8770`，并保留原始 Host 与 `X-Forwarded-*`，应用本身不用改。
 
