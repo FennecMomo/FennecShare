@@ -1,0 +1,29 @@
+{
+  "slug": "paper-notes",
+  "title": "便签纸",
+  "summary": "一个能真的用的网页便签本：添加、勾选、删除，内容保存在本地浏览器。",
+  "description": "这是一个用于演示「网页包在线体验」的小项目，所有交互都是真实可用的。\n\n能做的事：\n· 添加便签、勾选完成、单条删除、一键清空\n· 数据保存在浏览器 localStorage，刷新后仍然存在\n· 纯静态页面，没有后端，也没有网络请求\n\n它同时提供一个真实的 ZIP 下载：网页包原样打包，解压后双击 index.html 即可离线使用。",
+  "categories": ["web"],
+  "displayVersion": "1.0.0",
+  "sortOrder": 30,
+  "demo": true,
+  "cover": { "path": "media/cover.svg", "alt": "便签纸封面" },
+  "screenshots": [
+    { "path": "media/shot-1.svg", "alt": "便签列表界面" },
+    { "path": "media/shot-2.svg", "alt": "完成状态与进度" }
+  ],
+  "web": {
+    "directory": "web",
+    "entry": "index.html",
+    "spaFallback": false
+  },
+  "downloads": [
+    {
+      "fileName": "paper-notes-web-1.0.0.zip",
+      "path": "../../packages/paper-notes-web-1.0.0.zip",
+      "platform": "html",
+      "version": "1.0.0",
+      "default": true
+    }
+  ]
+}

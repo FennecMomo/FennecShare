@@ -1,0 +1,17 @@
+{
+  "slug": "pixel-garden",
+  "title": "像素花园",
+  "summary": "两页式静态小站：点方格开花，另有一个子目录页面用来验证相对路径。",
+  "description": "这个示例专门用来验证「多页面静态站 + 子目录」在子路径部署下是否正常。\n\n· 首页是 8 列像素方格，点击切换 空 → 幼苗 → 开花\n· 第二个页面位于 about/ 子目录，用 ../shared/style.css 引用上一级样式\n· 全部资源都写成相对路径，因此部署到 /play/<slug>/ 子路径也不会丢样式\n\nmanifest 里显式写了 entry: index.html —— 因为包内有两个 index.html，发布工具不会替你猜。",
+  "categories": ["web"],
+  "displayVersion": "0.4.2",
+  "sortOrder": 20,
+  "demo": true,
+  "cover": { "path": "media/cover.svg", "alt": "像素花园封面" },
+  "screenshots": [{ "path": "media/shot-1.svg", "alt": "像素花园首页" }],
+  "web": {
+    "directory": "web",
+    "entry": "index.html",
+    "spaFallback": false
+  }
+}

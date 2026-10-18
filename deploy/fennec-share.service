@@ -1,0 +1,37 @@
+[Unit]
+Description=Fennec Share - 项目展示与下载站
+Documentation=file://__APP_DIR__/docs/DEPLOYMENT.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=__APP_DIR__
+# 端口、数据目录、域名等全部来自 env 文件，unit 里不写密钥
+EnvironmentFile=__ENV_FILE__
+ExecStart=__NODE_BIN__ dist/server/index.js
+Restart=on-failure
+RestartSec=3
+TimeoutStopSec=20
+KillSignal=SIGTERM
+
+# 日志统一进 journald：journalctl -u fennec-share -f
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=fennec-share
+
+# 基本加固：系统目录只读（/usr /boot /etc），/home 与数据目录保持可写。
+# 注意不要用 ProtectSystem=strict：那会把整个文件系统（含 DATA_DIR）挂成只读，
+# 之后 service 自己就写不了 catalog 了。
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+
+[Install]
+WantedBy=multi-user.target

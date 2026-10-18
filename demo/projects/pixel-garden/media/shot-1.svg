@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500" role="img" aria-label="像素花园界面">
+  <rect width="800" height="500" fill="#06281f" />
+  <rect x="110" y="60" width="580" height="390" rx="22" fill="#0d3a2c" stroke="#1d5a45" stroke-width="2" />
+  <text x="150" y="118" fill="#4ade80" font-family="'PingFang SC','Microsoft YaHei',system-ui,sans-serif" font-size="14" letter-spacing="4">多页面静态示例</text>
+  <text x="150" y="164" fill="#e6f7ee" font-family="'PingFang SC','Microsoft YaHei',system-ui,sans-serif" font-size="30" font-weight="700">像素花园</text>
+  <g>
+    <g fill="#123f30" stroke="#1d5a45" stroke-width="1.5">
+      <rect x="150" y="196" width="52" height="52" rx="6" />
+      <rect x="210" y="196" width="52" height="52" rx="6" />
+      <rect x="270" y="196" width="52" height="52" rx="6" />
+      <rect x="330" y="196" width="52" height="52" rx="6" />
+      <rect x="390" y="196" width="52" height="52" rx="6" />
+      <rect x="450" y="196" width="52" height="52" rx="6" />
+      <rect x="510" y="196" width="52" height="52" rx="6" />
+      <rect x="570" y="196" width="52" height="52" rx="6" />
+      <rect x="150" y="256" width="52" height="52" rx="6" />
+      <rect x="210" y="256" width="52" height="52" rx="6" />
+      <rect x="270" y="256" width="52" height="52" rx="6" />
+      <rect x="330" y="256" width="52" height="52" rx="6" />
+      <rect x="390" y="256" width="52" height="52" rx="6" />
+      <rect x="450" y="256" width="52" height="52" rx="6" />
+      <rect x="510" y="256" width="52" height="52" rx="6" />
+      <rect x="570" y="256" width="52" height="52" rx="6" />
+      <rect x="150" y="316" width="52" height="52" rx="6" />
+      <rect x="210" y="316" width="52" height="52" rx="6" />
+      <rect x="270" y="316" width="52" height="52" rx="6" />
+      <rect x="330" y="316" width="52" height="52" rx="6" />
+      <rect x="390" y="316" width="52" height="52" rx="6" />
+      <rect x="450" y="316" width="52" height="52" rx="6" />
+      <rect x="510" y="316" width="52" height="52" rx="6" />
+      <rect x="570" y="316" width="52" height="52" rx="6" />
+    </g>
+    <g fill="#1f7a4d">
+      <rect x="210" y="196" width="52" height="52" rx="6" />
+      <rect x="450" y="256" width="52" height="52" rx="6" />
+      <rect x="330" y="316" width="52" height="52" rx="6" />
+      <rect x="570" y="196" width="52" height="52" rx="6" />
+    </g>
+    <g fill="#4ade80">
+      <rect x="270" y="256" width="52" height="52" rx="6" />
+      <rect x="510" y="316" width="52" height="52" rx="6" />
+    </g>
+  </g>
+  <text x="150" y="402" fill="#9fd8bd" font-family="'PingFang SC','Microsoft YaHei',system-ui,sans-serif" font-size="14">已种下 8 格，其中 2 格开花。</text>
+  <text x="150" y="430" fill="#4ade80" font-family="'PingFang SC','Microsoft YaHei',system-ui,sans-serif" font-size="14">关于这个小站 →</text>
+</svg>

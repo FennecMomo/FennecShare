@@ -1,0 +1,27 @@
+# 依赖与构建产物
+node_modules/
+dist/
+
+# 本地发布数据（绝不提交；生产在独立 DATA_DIR）
+data/
+data-*/
+tmp/
+staging/
+publish-staging/
+backups/
+artifacts/*.tgz
+artifacts/*.tgz.sha256
+
+# 本机私有运维脚本与会话状态（含本机路径与自动化凭据逻辑，不进仓库）
+ops/
+
+# 日志与临时文件
+*.log
+*.tsbuildinfo
+.DS_Store
+Thumbs.db
+
+# 真实环境配置
+.env
+.env.*
+!.env.example

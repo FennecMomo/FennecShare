@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500" role="img" aria-label="像素花园封面">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0b3a2b" />
+      <stop offset="1" stop-color="#062419" />
+    </linearGradient>
+  </defs>
+  <rect width="800" height="500" fill="url(#bg)" />
+  <g opacity="0.9">
+    <g fill="#0f4a36">
+      <rect x="120" y="120" width="56" height="56" rx="8" />
+      <rect x="184" y="120" width="56" height="56" rx="8" />
+      <rect x="120" y="184" width="56" height="56" rx="8" />
+      <rect x="376" y="184" width="56" height="56" rx="8" />
+      <rect x="440" y="120" width="56" height="56" rx="8" />
+      <rect x="184" y="312" width="56" height="56" rx="8" />
+      <rect x="568" y="312" width="56" height="56" rx="8" />
+    </g>
+    <g fill="#4ade80">
+      <rect x="248" y="120" width="56" height="56" rx="8" />
+      <rect x="376" y="248" width="56" height="56" rx="8" />
+      <rect x="504" y="184" width="56" height="56" rx="8" />
+      <rect x="632" y="120" width="56" height="56" rx="8" opacity="0.75" />
+    </g>
+    <g fill="#1f7a4d">
+      <rect x="312" y="312" width="56" height="56" rx="8" />
+      <rect x="440" y="312" width="56" height="56" rx="8" />
+      <rect x="248" y="248" width="56" height="56" rx="8" />
+      <rect x="568" y="120" width="56" height="56" rx="8" />
+      <rect x="120" y="248" width="56" height="56" rx="8" />
+    </g>
+  </g>
+  <g fill="#a7f3d0" opacity="0.5">
+    <circle cx="276" cy="148" r="7" />
+    <circle cx="404" cy="276" r="7" />
+    <circle cx="532" cy="212" r="7" />
+    <circle cx="660" cy="148" r="7" />
+  </g>
+  <text x="120" y="446" fill="#a7f3d0" font-family="'PingFang SC','Microsoft YaHei',system-ui,sans-serif" font-size="24" letter-spacing="2">PIXEL GARDEN</text>
+</svg>

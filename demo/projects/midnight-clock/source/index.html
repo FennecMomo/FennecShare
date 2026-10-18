@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>夜间时钟</title>
+    <style>
+      :root {
+        color-scheme: dark;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+      }
+      body {
+        display: grid;
+        place-items: center;
+        background:
+          radial-gradient(900px 600px at 30% -20%, #16324f 0%, rgba(22, 50, 79, 0) 65%),
+          radial-gradient(700px 500px at 90% 110%, #0f3b46 0%, rgba(15, 59, 70, 0) 60%),
+          #060d15;
+        color: #e8f2ff;
+        font-family: ui-monospace, "Cascadia Code", "PingFang SC", system-ui, sans-serif;
+        text-align: center;
+      }
+      main {
+        padding: 24px;
+      }
+      .time {
+        font-size: clamp(52px, 16vw, 132px);
+        font-weight: 300;
+        letter-spacing: 0.04em;
+        line-height: 1;
+        font-variant-numeric: tabular-nums;
+        text-shadow: 0 0 40px rgba(96, 165, 250, 0.35);
+      }
+      .time .seconds {
+        font-size: 0.34em;
+        color: #7dd3fc;
+        margin-left: 0.16em;
+      }
+      .date {
+        margin-top: 14px;
+        color: #93a9c2;
+        font-size: clamp(13px, 2.6vw, 17px);
+        letter-spacing: 0.22em;
+      }
+      .hint {
+        margin-top: 38px;
+        color: #5d7893;
+        font-size: 12px;
+        letter-spacing: 0.08em;
+      }
+      .dot {
+        display: inline-block;
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: #38bdf8;
+        margin-right: 8px;
+        vertical-align: middle;
+        animation: pulse 2.4s ease-in-out infinite;
+      }
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 0.35;
+        }
+        50% {
+          opacity: 1;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .dot {
+          animation: none;
+          opacity: 1;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="time" id="time">--:--<span class="seconds" id="seconds">--</span></div>
+      <div class="date" id="date">正在读取本地时间</div>
+      <p class="hint"><span class="dot"></span>这是一个单文件 HTML 试玩包</p>
+    </main>
+    <script>
+      (function () {
+        var timeEl = document.getElementById('time');
+        var secondsEl = document.getElementById('seconds');
+        var dateEl = document.getElementById('date');
+        var weekdays = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
+
+        function pad(value) {
+          return value < 10 ? '0' + value : String(value);
+        }
+
+        function tick() {
+          var now = new Date();
+          timeEl.firstChild.nodeValue = pad(now.getHours()) + ':' + pad(now.getMinutes());
+          secondsEl.textContent = pad(now.getSeconds());
+          dateEl.textContent =
+            now.getFullYear() +
+            ' 年 ' +
+            (now.getMonth() + 1) +
+            ' 月 ' +
+            now.getDate() +
+            ' 日 · ' +
+            weekdays[now.getDay()];
+        }
+
+        tick();
+        setInterval(tick, 1000);
+      })();
+    </script>
+  </body>
+</html>

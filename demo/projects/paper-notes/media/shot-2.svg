@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500" role="img" aria-label="完成状态">
+  <rect width="800" height="500" fill="#f2ece0" />
+  <rect x="150" y="90" width="500" height="320" rx="22" fill="#fdfaf3" stroke="#e6ddcb" stroke-width="2" />
+  <text x="190" y="150" fill="#33302b" font-family="'PingFang SC','Microsoft YaHei',system-ui,sans-serif" font-size="26" font-weight="700">便签纸</text>
+  <g font-family="'PingFang SC','Microsoft YaHei',system-ui,sans-serif" font-size="16">
+    <rect x="190" y="180" width="420" height="48" rx="10" fill="#fffdf8" stroke="#e6ddcb" stroke-width="2" />
+    <rect x="208" y="196" width="17" height="17" rx="4" fill="#b45309" stroke="#b45309" stroke-width="2" />
+    <path d="M211 204l4 4 8-9" stroke="#ffffff" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round" />
+    <text x="240" y="211" fill="#857f74">发布工具写完了</text>
+
+    <rect x="190" y="236" width="420" height="48" rx="10" fill="#fffdf8" stroke="#e6ddcb" stroke-width="2" />
+    <rect x="208" y="252" width="17" height="17" rx="4" fill="#b45309" stroke="#b45309" stroke-width="2" />
+    <path d="M211 260l4 4 8-9" stroke="#ffffff" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round" />
+    <text x="240" y="267" fill="#857f74">本地试玩通过</text>
+
+    <rect x="190" y="292" width="420" height="48" rx="10" fill="#fffdf8" stroke="#e6ddcb" stroke-width="2" />
+    <rect x="208" y="308" width="17" height="17" rx="4" fill="none" stroke="#b45309" stroke-width="2" />
+    <text x="240" y="323">给 Hermes 发部署请求</text>
+  </g>
+  <text x="190" y="378" fill="#857f74" font-family="'PingFang SC','Microsoft YaHei',system-ui,sans-serif" font-size="14">2 / 3 已完成</text>
+</svg>
