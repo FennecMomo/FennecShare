@@ -132,6 +132,7 @@ $CLI publish --manifest /home/ubuntu/fennec-share-staging/my-tool/manifest.json
 | `description` | 否 | 详情正文，最长 20000，换行会保留 |
 | `categories` | 否 | `web` / `desktop` / `mobile`；不写会按实际文件推导，推导不出就报错 |
 | `displayVersion` | 否 | 显示用版本号，最长 40；可以是字符串或数字 |
+| `tags` | 否 | 字符串数组，会登记到标签表；不写就沿用项目现有标签 |
 | `sortOrder` | 否 | 数字，越大越靠前，默认 0 |
 | `published` | 否 | 默认 `true`；`false` 等于发布成下架状态 |
 | `demo` | 否 | 默认 `false`；`true` 会在页面显示「示例」 |

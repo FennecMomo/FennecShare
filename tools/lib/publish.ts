@@ -8,6 +8,7 @@ import type {
   Platform,
   StoredDownload,
   StoredProject,
+  TagRecord,
   WebRelease,
 } from '../../shared/types.js';
 import type { PublisherConfig } from '../../server/config.js';
@@ -428,6 +429,7 @@ function buildProject(args: {
     summary: manifest.summary,
     description: manifest.description,
     categories: manifest.categories,
+    tags: manifest.tags ?? existing?.tags ?? [],
     cover,
     screenshots,
     createdAt: existing?.createdAt ?? nowIso,
@@ -445,6 +447,18 @@ function buildProject(args: {
   };
 
   return { project, parts, warnings };
+}
+
+/** 把项目里的标签并进 catalog 的标签登记表（新标签追加到末尾）。 */
+export function mergeTagRegistry(existing: TagRecord[] | undefined, tags: string[], nowIso: string): TagRecord[] {
+  const registry = [...(existing ?? [])];
+  const known = new Set(registry.map((item) => item.label.toLowerCase()));
+  for (const label of tags) {
+    if (known.has(label.toLowerCase())) continue;
+    registry.push({ label, createdAt: nowIso });
+    known.add(label.toLowerCase());
+  }
+  return registry;
 }
 
 function replaceProject(catalog: CatalogFile, project: StoredProject): CatalogFile {
@@ -601,6 +615,7 @@ export async function publishProject(config: PublisherConfig, options: PublishOp
       const finalProject: StoredProject = { ...project, releaseHistory };
 
       const nextCatalog: CatalogFile = replaceProject(catalog, finalProject);
+      nextCatalog.tags = mergeTagRegistry(catalog.tags, finalProject.tags, nowIso);
       nextCatalog.revision = catalog.revision + 1;
       nextCatalog.generatedAt = nowIso;
 

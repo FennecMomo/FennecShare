@@ -20,6 +20,7 @@ export function createEmptyCatalog(now = new Date()): CatalogFile {
     schemaVersion: CATALOG_SCHEMA_VERSION,
     revision: 0,
     generatedAt: now.toISOString(),
+    tags: [],
     projects: [],
   };
 }
@@ -52,6 +53,7 @@ export function toPublicProject(project: StoredProject): PublicProject {
     summary: project.summary,
     description: project.description,
     categories: project.categories,
+    tags: project.tags ?? [],
     cover: project.cover,
     screenshots: project.screenshots,
     createdAt: project.createdAt,
@@ -93,6 +95,26 @@ export function isValidSlug(value: unknown): value is string {
   return typeof value === 'string' && value.length <= SLUG_MAX_LENGTH && SLUG_PATTERN.test(value);
 }
 
+/**
+ * 兼容旧数据：tags 是后加的字段，旧 catalog 里没有。
+ * 校验通过后统一补齐，读的人和写的人都不用再判空。
+ */
+export function normalizeCatalog(catalog: CatalogFile): CatalogFile {
+  return {
+    ...catalog,
+    tags: Array.isArray(catalog.tags) ? catalog.tags : [],
+    projects: catalog.projects.map((project) => ({
+      ...project,
+      tags: Array.isArray(project.tags) ? project.tags : [],
+    })),
+  };
+}
+
+/** 标签规范：去首尾空格、内部空白折叠成一个空格。 */
+export function normalizeTagLabel(label: string): string {
+  return label.trim().replace(/\\s+/g, ' ');
+}
+
 /** 已存在的公开下载 URL 前缀，服务端只接受这个形状的 URL。 */
 const DOWNLOAD_URL_PATTERN = /^\/download\/[a-z0-9-]+\/[^/\\?#]+$/;
 const PLAY_URL_PATTERN = /^\/play\/[a-z0-9-]+\/$/;
@@ -125,6 +147,31 @@ export function validateCatalog(value: unknown): { ok: true; catalog: CatalogFil
   if (typeof raw.generatedAt !== 'string' || Number.isNaN(Date.parse(raw.generatedAt))) {
     push('generatedAt', '必须是 ISO 时间字符串');
   }
+  if (raw.tags !== undefined) {
+    if (!Array.isArray(raw.tags)) {
+      push('tags', '必须是数组');
+    } else {
+      const seenTags = new Set<string>();
+      raw.tags.forEach((item, index) => {
+        const entry = item as Record<string, unknown> | null;
+        if (typeof entry !== 'object' || entry === null) {
+          push(`tags[${index}]`, '必须是对象');
+          return;
+        }
+        if (typeof entry.label !== 'string' || entry.label.trim().length === 0) {
+          push(`tags[${index}].label`, '不能为空');
+          return;
+        }
+        const key = entry.label.trim().toLowerCase();
+        if (seenTags.has(key)) push(`tags[${index}].label`, `标签重复：${entry.label}`);
+        else seenTags.add(key);
+        if (typeof entry.createdAt !== 'string' || Number.isNaN(Date.parse(entry.createdAt))) {
+          push(`tags[${index}].createdAt`, '必须是 ISO 时间字符串');
+        }
+      });
+    }
+  }
+
   if (!Array.isArray(raw.projects)) {
     push('projects', '必须是数组');
     return { ok: false, issues };
@@ -157,6 +204,23 @@ export function validateCatalog(value: unknown): { ok: true; catalog: CatalogFil
         if (!isCategory(category)) push(`${at}.categories[${categoryIndex}]`, `未知分类：${String(category)}`);
       });
     }
+    if (project.tags !== undefined) {
+      if (!Array.isArray(project.tags)) {
+        push(`${at}.tags`, '必须是数组');
+      } else {
+        const seenProjectTags = new Set<string>();
+        project.tags.forEach((tag, tagIndex) => {
+          if (typeof tag !== 'string' || tag.trim().length === 0) {
+            push(`${at}.tags[${tagIndex}]`, '必须是非空字符串');
+            return;
+          }
+          const key = tag.trim().toLowerCase();
+          if (seenProjectTags.has(key)) push(`${at}.tags[${tagIndex}]`, `标签重复：${tag}`);
+          else seenProjectTags.add(key);
+        });
+      }
+    }
+
     for (const field of ['createdAt', 'updatedAt'] as const) {
       if (typeof project[field] !== 'string' || Number.isNaN(Date.parse(String(project[field])))) {
         push(`${at}.${field}`, '必须是 ISO 时间字符串');
@@ -275,5 +339,5 @@ export function validateCatalog(value: unknown): { ok: true; catalog: CatalogFil
   });
 
   if (issues.length > 0) return { ok: false, issues };
-  return { ok: true, catalog: value as CatalogFile };
+  return { ok: true, catalog: normalizeCatalog(value as CatalogFile) };
 }

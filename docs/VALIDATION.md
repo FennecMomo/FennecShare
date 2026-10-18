@@ -178,7 +178,49 @@ Cloudflare Zero Trust → Tunnels → `personal` → Public Hostname 新增
 
 > 这轮验证没有修改任何项目数据：管理页只做了登录、读列表、退出。
 
-## 九、没有验证 / 明确不支持的部分
+## 九、标签、试玩包与数据看板（2026-10-19 本地验证）
+
+这一轮新增五项能力，本地全部跑通：管理页新建项目、管理页发布新版本（试玩包 / 下载包）、
+一键发布试玩（只收 HTML/ZIP）、标签体系、点击与下载统计。
+
+### 10.1 自动化检查
+
+| 套件 | 结果 |
+| --- | --- |
+| 集成自测 `npm run selftest` | **56 项全过**（新增 8 项：标签增删、新建项目、单文件 HTML 发布、ZIP 自动识别入口、非页面内容拒绝、下载包上传/覆盖、埋点上报与后台聚合、未登录拒绝写入） |
+| 浏览器验收 `tools/browser-check.mjs` | **29 项全过**（有标签的数据 29 项，无标签的数据 28 项并跳过标签筛选） |
+| 类型检查 / 构建 | 通过（前端两个入口 + 服务端） |
+
+浏览器里真实操作过的流程（对着临时数据目录 `data-preview`，不碰真实项目）：
+
+1. 后台「添加项目」建出 `upload-demo` → 列表出现、状态已上架；
+2. 上传单文件 `upload-demo.html` → 入口保留原文件名，`/play/upload-demo/` 打开后页面里是上传的内容；
+3. 上传 `upload-demo.apk` → 下载列表出现 `Windows / 256 B`，`/download/upload-demo/upload-demo.apk` 可取回；
+4. 前台用 `/?p=upload-demo` 打开 → 弹窗标题正确；
+5. 后台删掉「实验」标签 → 该标签从项目上一起消失。
+
+数据目录里的落地结果（同一次验证）：
+
+```
+projects/upload-demo/history/000001-create.json
+projects/upload-demo/history/000002-web.json
+projects/upload-demo/history/000003-downloads.json
+projects/upload-demo/releases/r-.../web/upload-demo.html        ← 原文件名
+projects/upload-demo/releases/r-.../downloads/01-9bc038d0.apk   ← 内部存储名，对外仍是原名
+```
+
+### 10.2 埋点
+
+| 场景 | 验证方式 | 结果 |
+| --- | --- | --- |
+| 分享点击 | 浏览器点卡片分享 → 查 `/api/projects` | 计数 +1 |
+| 试玩点击 | 详情里点「在线体验」→ 查 `/api/projects` | 计数 +1 |
+| 下载 | `GET /download/...` → 查 `/api/projects` 与 `/api/admin/stats` | 计数 +1，`HEAD` 与 `bytes=N-` 不计 |
+| 后台看板 | 打开 `/admin` → 数据 Tab | 总量、14 天趋势、平台分布、按项目四块都有数 |
+
+埋点文件是 `DATA_DIR/stats/events.jsonl`，一行一个事件；不记 IP / UA / cookie。
+
+## 十、没有验证 / 明确不支持的部分
 
 | 项 | 说明 |
 | --- | --- |
@@ -191,3 +233,8 @@ Cloudflare Zero Trust → Tunnels → `personal` → Public Hostname 新增
 | 超大文件 | 默认限额 4 GiB，但没有实测大文件；服务器出口带宽约 5 Mbps |
 | 浏览器兼容 | 只在 Edge（Chromium）上实测；Safari / Firefox 未实测，代码只用了标准 API |
 | 域名 HTTPS | 由上游 Cloudflare 提供，本项目不处理证书 |
+| 埋点准确性 | 客户端上报的点击可被脚本伪造或拦截（没有签名、没有防机器人）；下载是服务端计数，相对可靠。数字用于看趋势，不适合当结算依据 |
+| 埋点容量 | `events.jsonl` 只追加不归档；超过 20 万条会打 warn 日志，需要手工挪走旧文件 |
+| 标签 | 单层标签，没有分组、没有层级、没有颜色；改名等价于「删掉再建」（引用会被一起摘掉） |
+| 管理页上传 | 单次请求体在内存里处理；试玩包按 2 GiB、下载包按 4 GiB 上限放行，超大包会很吃内存 |
+| 并发编辑 | 管理页没有「同一项目正在被别人编辑」的提示，两个标签页同时保存时以后保存的为准 |

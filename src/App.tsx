@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { CATEGORIES, type Category, type PublicProject } from '../shared/types';
+import { CATEGORIES, type Category, type PublicProjectView } from '../shared/types';
 import { useCatalog } from './hooks/useCatalog';
 import { CategoryFilter } from './components/CategoryFilter';
 import { ProjectDialog } from './components/ProjectDialog';
 import { ProjectGrid } from './components/ProjectGrid';
+import { TagFilter } from './components/TagFilter';
 import { StatusPanel } from './components/StatusPanel';
 import { IconAlert, IconInbox, IconRefresh } from './components/icons';
 import { formatDateTime } from './format';
@@ -12,12 +13,15 @@ import { readDeepLinkSlug } from './share';
 export default function App() {
   const { status, data, error, reload } = useCatalog();
   const [selected, setSelected] = useState<Category[]>([]);
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [activeSlug, setActiveSlug] = useState<string | null>(null);
   const [toast, setToast] = useState<{ text: string; id: number } | null>(null);
   const deepLinkHandled = useRef(false);
 
-  const projects = useMemo<PublicProject[]>(() => data?.projects ?? [], [data]);
+  const projects = useMemo<PublicProjectView[]>(() => data?.projects ?? [], [data]);
   const selectedSet = useMemo(() => new Set(selected), [selected]);
+  const selectedTagSet = useMemo(() => new Set(selectedTags), [selectedTags]);
+  const allTags = useMemo(() => data?.tags ?? [], [data]);
 
   const counts = useMemo(() => {
     const result = Object.fromEntries(CATEGORIES.map((category) => [category, 0])) as Record<Category, number>;
@@ -27,10 +31,25 @@ export default function App() {
     return result;
   }, [projects]);
 
+  const tagCounts = useMemo(() => {
+    const result: Record<string, number> = {};
+    for (const tag of allTags) result[tag] = 0;
+    for (const project of projects) {
+      for (const tag of project.tags) {
+        if (tag in result) result[tag] = (result[tag] ?? 0) + 1;
+      }
+    }
+    return result;
+  }, [allTags, projects]);
+
   const visible = useMemo(() => {
-    if (selectedSet.size === 0) return projects;
-    return projects.filter((project) => project.categories.some((category) => selectedSet.has(category)));
-  }, [projects, selectedSet]);
+    return projects.filter((project) => {
+      const categoryOk = selectedSet.size === 0 || project.categories.some((category) => selectedSet.has(category));
+      if (!categoryOk) return false;
+      if (selectedTagSet.size === 0) return true;
+      return project.tags.some((tag) => selectedTagSet.has(tag));
+    });
+  }, [projects, selectedSet, selectedTagSet]);
 
   const activeProject = useMemo(
     () => (activeSlug ? projects.find((project) => project.slug === activeSlug) ?? null : null),
@@ -50,7 +69,16 @@ export default function App() {
     );
   }, []);
 
-  const clearFilter = useCallback(() => setSelected([]), []);
+  const toggleTag = useCallback((tag: string) => {
+    setSelectedTags((previous) =>
+      previous.includes(tag) ? previous.filter((item) => item !== tag) : [...previous, tag],
+    );
+  }, []);
+
+  const clearFilter = useCallback(() => {
+    setSelected([]);
+    setSelectedTags([]);
+  }, []);
 
   const showToast = useCallback((text: string) => {
     setToast({ text, id: Date.now() });
@@ -136,7 +164,7 @@ export default function App() {
           <p className="result-summary" aria-live="polite">
             {showInitialLoading ? (
               '正在加载项目…'
-            ) : selectedSet.size === 0 ? (
+            ) : selectedSet.size === 0 && selectedTagSet.size === 0 ? (
               <>
                 共 <b>{projects.length}</b> 个项目
               </>
@@ -146,12 +174,20 @@ export default function App() {
               </>
             )}
           </p>
-          {selectedSet.size > 0 ? (
+          {selectedSet.size > 0 || selectedTagSet.size > 0 ? (
             <button type="button" className="result-reset" onClick={clearFilter}>
               清除筛选
             </button>
           ) : null}
         </div>
+
+        <TagFilter
+          tags={allTags}
+          selected={selectedTagSet}
+          counts={tagCounts}
+          onToggle={toggleTag}
+          onClear={() => setSelectedTags([])}
+        />
 
         {status === 'error' && data !== null ? (
           <div className="note-muted" style={{ marginBottom: 16 }} role="status">

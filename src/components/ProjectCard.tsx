@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { CATEGORY_LABELS, type PublicProject } from '../../shared/types';
+import { CATEGORY_LABELS, type PublicProjectView } from '../../shared/types';
 import { formatDate } from '../format';
 import { copyText, shareUrlFor } from '../share';
+import { reportStat } from '../stats';
 import { IconCheck, IconDownload, IconExternal, IconShare } from './icons';
 
 const PLACEHOLDER_COVER = '/placeholder-cover.svg';
 
 interface ProjectCardProps {
-  project: PublicProject;
+  project: PublicProjectView;
   onOpen: (slug: string) => void;
   onShared: (message: string) => void;
 }
@@ -15,6 +16,7 @@ interface ProjectCardProps {
 export function ProjectCard({ project, onOpen, onShared }: ProjectCardProps) {
   const [imageFailed, setImageFailed] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [shareBonus, setShareBonus] = useState(0);
   const timerRef = useRef<number | null>(null);
   const coverSrc = !project.cover || imageFailed ? PLACEHOLDER_COVER : project.cover.url;
 
@@ -37,6 +39,8 @@ export function ProjectCard({ project, onOpen, onShared }: ProjectCardProps) {
       return;
     }
     setCopied(true);
+    setShareBonus((value) => value + 1);
+    reportStat('share_click', project.slug, 'card');
     onShared(`已复制「${project.title}」的分享链接`);
     if (timerRef.current !== null) window.clearTimeout(timerRef.current);
     timerRef.current = window.setTimeout(() => setCopied(false), 1800);
@@ -44,6 +48,7 @@ export function ProjectCard({ project, onOpen, onShared }: ProjectCardProps) {
 
   const hasWeb = project.web !== null;
   const hasDownloads = project.downloads.length > 0;
+  const shareCount = project.stats.shareClicks + shareBonus;
 
   return (
     <article className="card">
@@ -60,6 +65,11 @@ export function ProjectCard({ project, onOpen, onShared }: ProjectCardProps) {
           {project.categories.map((category) => (
             <span className="tag" key={category}>
               {CATEGORY_LABELS[category]}
+            </span>
+          ))}
+          {project.tags.map((tag) => (
+            <span className="tag tag-project" key={tag}>
+              #{tag}
             </span>
           ))}
         </div>
@@ -83,6 +93,24 @@ export function ProjectCard({ project, onOpen, onShared }: ProjectCardProps) {
               </span>
             ) : null}
           </span>
+        </div>
+        <div className="card-stats" aria-label="项目数据">
+          {hasWeb ? (
+            <span className="stat" title="试玩点击">
+              <span aria-hidden="true">▶</span>
+              {project.stats.playClicks}
+            </span>
+          ) : null}
+          <span className="stat" title="分享点击">
+            <IconShare size={12} />
+            {shareCount}
+          </span>
+          {hasDownloads ? (
+            <span className="stat" title="下载次数">
+              <IconDownload size={12} />
+              {project.stats.downloads}
+            </span>
+          ) : null}
         </div>
       </div>
       {/* 分享按钮：z-index 高于整卡覆盖层，点它只复制链接、不打开详情 */}

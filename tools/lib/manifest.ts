@@ -1,7 +1,14 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { CATEGORIES, SLUG_MAX_LENGTH, type Category, type Platform } from '../../shared/types.js';
-import { isCategory, isPlatform, isValidSlug } from '../../shared/catalog.js';
+import {
+  CATEGORIES,
+  SLUG_MAX_LENGTH,
+  TAG_MAX_COUNT,
+  TAG_MAX_LENGTH,
+  type Category,
+  type Platform,
+} from '../../shared/types.js';
+import { isCategory, isPlatform, isValidSlug, normalizeTagLabel } from '../../shared/catalog.js';
 import { isSafeFileName } from '../../shared/paths.js';
 import { PublishError } from './errors.js';
 
@@ -42,6 +49,8 @@ export interface ResolvedManifest {
   description: string;
   categories: Category[];
   displayVersion: string | null;
+  /** 标签（null 表示 manifest 没写，沿用项目现有标签）；会自动登记到 catalog.tags。 */
+  tags: string[] | null;
   sortOrder: number;
   published: boolean;
   demo: boolean;
@@ -263,6 +272,33 @@ export function loadManifest(manifestPathRaw: string, limits: PublishLimits = lo
     else if (typeof input.displayVersion === 'string') displayVersion = input.displayVersion.trim() || null;
     else issues.push('displayVersion 必须是字符串或数字');
     if (displayVersion && displayVersion.length > 40) issues.push('displayVersion 过长（上限 40 字符）');
+  }
+
+  let tags: string[] | null = null;
+  if (input.tags !== undefined) {
+    if (!Array.isArray(input.tags)) {
+      issues.push('tags 必须是字符串数组');
+    } else {
+      const collected: string[] = [];
+      const seenTags = new Set<string>();
+      for (const item of input.tags) {
+        if (typeof item !== 'string') {
+          issues.push('tags 里只能放字符串');
+          continue;
+        }
+        const label = normalizeTagLabel(item);
+        if (label.length === 0) continue;
+        if (label.length > TAG_MAX_LENGTH) {
+          issues.push(`标签过长（上限 ${TAG_MAX_LENGTH} 字符）：${label}`);
+          continue;
+        }
+        if (seenTags.has(label.toLowerCase())) continue;
+        seenTags.add(label.toLowerCase());
+        collected.push(label);
+      }
+      if (collected.length > TAG_MAX_COUNT) issues.push(`标签过多（上限 ${TAG_MAX_COUNT} 个）`);
+      tags = collected;
+    }
   }
 
   let sortOrder = 0;
@@ -538,6 +574,7 @@ export function loadManifest(manifestPathRaw: string, limits: PublishLimits = lo
     summary,
     description,
     categories,
+    tags,
     displayVersion,
     sortOrder,
     published,

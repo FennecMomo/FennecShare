@@ -1043,3 +1043,107 @@ button {
     font-size: 0.85rem;
   }
 }
+
+/* ---------- 标签筛选 ---------- */
+.tag-filter {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 0 0 20px;
+}
+
+.tag-filter-label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.tag-filter-list {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.tag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 13px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--ink-soft);
+  font: inherit;
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.tag-chip:hover {
+  border-color: var(--border-strong);
+  background: var(--surface-soft);
+}
+
+.tag-chip.is-active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent-deep);
+  font-weight: 600;
+}
+
+.tag-chip-count {
+  font-size: 0.72rem;
+  opacity: 0.7;
+}
+
+.tag-chip-clear {
+  border-style: dashed;
+  color: var(--muted);
+}
+
+.tag-chip:focus-visible {
+  outline: 2px solid var(--accent-ring);
+  outline-offset: 2px;
+}
+
+/* 项目标签：和类型标签区分开，弱一点 */
+.tag-project {
+  background: var(--surface-soft);
+  color: var(--ink-soft);
+  border: 1px solid var(--border);
+}
+
+/* 卡片底部的数据行 */
+.card-stats {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 10px;
+  padding-top: 9px;
+  border-top: 1px dashed var(--border);
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.dialog-stats {
+  display: flex;
+  gap: 18px;
+  flex-wrap: wrap;
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.dialog-stats b {
+  color: var(--ink);
+  font-size: 1rem;
+  margin-right: 4px;
+}

@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef } from 'react';
-import { CATEGORY_LABELS, PLATFORM_LABELS, type PublicProject } from '../../shared/types';
+import { CATEGORY_LABELS, PLATFORM_LABELS, type PublicProjectView } from '../../shared/types';
 import { formatBytes, formatDate } from '../format';
 import { copyText, shareUrlFor } from '../share';
+import { reportStat } from '../stats';
 import { Gallery, type GalleryImage } from './Gallery';
 import { IconClose, IconDownload, IconExternal, IconShare } from './icons';
 
@@ -15,7 +16,7 @@ const PLATFORM_ORDER: Record<string, number> = {
 };
 
 interface ProjectDialogProps {
-  project: PublicProject | null;
+  project: PublicProjectView | null;
   onClose: () => void;
   onShared: (message: string) => void;
 }
@@ -95,6 +96,11 @@ export function ProjectDialog({ project, onClose, onShared }: ProjectDialogProps
                     {CATEGORY_LABELS[category]}
                   </span>
                 ))}
+                {project.tags.map((tag) => (
+                  <span className="tag tag-project" key={tag}>
+                    #{tag}
+                  </span>
+                ))}
                 {project.demo ? <span className="platform-pill">示例数据</span> : null}
                 <span>{project.displayVersion ? `版本 ${project.displayVersion}` : '未标注版本'}</span>
                 <span>更新于 {formatDate(project.updatedAt)}</span>
@@ -128,6 +134,7 @@ export function ProjectDialog({ project, onClose, onShared }: ProjectDialogProps
                         href={project.web.publicUrl}
                         target="_blank"
                         rel="noopener noreferrer"
+                        onClick={() => reportStat('play_click', project.slug, 'dialog')}
                       >
                         <IconExternal size={16} />
                         在线体验
@@ -163,6 +170,25 @@ export function ProjectDialog({ project, onClose, onShared }: ProjectDialogProps
             </section>
 
             <section>
+              <h3 className="section-title">项目数据</h3>
+              <div className="dialog-stats">
+                {project.web ? (
+                  <span>
+                    <b>{project.stats.playClicks}</b>次试玩点击
+                  </span>
+                ) : null}
+                <span>
+                  <b>{project.stats.shareClicks}</b>次分享点击
+                </span>
+                {downloads.length > 0 ? (
+                  <span>
+                    <b>{project.stats.downloads}</b>次下载
+                  </span>
+                ) : null}
+              </div>
+            </section>
+
+            <section>
               <h3 className="section-title">分享</h3>
               <div className="actions">
                 <button
@@ -170,6 +196,7 @@ export function ProjectDialog({ project, onClose, onShared }: ProjectDialogProps
                   className="btn btn-ghost"
                   onClick={async () => {
                     const ok = await copyText(shareUrlFor(project.slug));
+                    if (ok) reportStat('share_click', project.slug, 'dialog');
                     onShared(ok ? '分享链接已复制，对方打开会自动打开这个项目' : '复制失败，请手动复制地址栏里的链接');
                   }}
                 >

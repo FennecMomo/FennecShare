@@ -9,6 +9,7 @@ import { createMediaMiddleware } from './routes/media.js';
 import { createSiteMiddleware } from './routes/site.js';
 import { createAdminApiRouter, createAdminPageMiddleware } from './routes/admin.js';
 import { SessionStore } from './admin/sessions.js';
+import { StatsStore } from './stats.js';
 import { notFoundHandler, sendJson } from './http.js';
 
 export interface CreateAppOptions {
@@ -16,6 +17,8 @@ export interface CreateAppOptions {
   logger: Logger;
   /** 允许测试注入自定义 store（例如独立临时数据目录）。 */
   store?: CatalogStore;
+  /** 允许测试注入独立的埋点存储。 */
+  stats?: StatsStore;
 }
 
 export interface CreatedApp {
@@ -27,6 +30,7 @@ export function createApp(options: CreateAppOptions): CreatedApp {
   const { config, logger } = options;
   const store = options.store ?? new CatalogStore(config.dataDir, logger);
   const sessions = new SessionStore();
+  const stats = options.stats ?? new StatsStore(config.dataDir, logger);
   const app = express();
 
   app.disable('x-powered-by');
@@ -59,8 +63,8 @@ export function createApp(options: CreateAppOptions): CreatedApp {
     }
   });
 
-  app.use('/api/admin', createAdminApiRouter({ config, logger, sessions }));
-  app.use('/api', createApiRouter(store));
+  app.use('/api/admin', createAdminApiRouter({ config, logger, sessions, stats }));
+  app.use('/api', createApiRouter({ store, stats, logger }));
 
   app.use(
     createPlayMiddleware({
@@ -74,6 +78,7 @@ export function createApp(options: CreateAppOptions): CreatedApp {
     createDownloadMiddleware({
       dataDir: config.dataDir,
       store,
+      stats,
       logger,
     }),
   );

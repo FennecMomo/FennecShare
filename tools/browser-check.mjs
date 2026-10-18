@@ -290,6 +290,42 @@ try {
     await shared.close();
   });
 
+  await check('卡片展示试玩/分享/下载计数', async () => {
+    const stats = page.locator('.card').first().locator('.card-stats');
+    assertEqual(await stats.count(), 1, '每张卡片都应有数据行');
+    const text = await stats.innerText();
+    assert(/\d/.test(text), `数据行里应有数字，实际「${text}」`);
+  });
+
+  const tagChipSelector = '.tag-filter .tag-chip:not(.tag-chip-clear)';
+  const tagChipCount = await page.locator(tagChipSelector).count();
+  if (tagChipCount > 0) {
+    await check('标签筛选：选中标签后只剩带该标签的项目，清除后恢复', async () => {
+      const total = await page.locator('.card').count();
+      const firstChip = page.locator(tagChipSelector).first();
+      const label = (await firstChip.innerText()).split('\n')[0].trim();
+      await firstChip.click();
+      await page.waitForFunction((limit) => {
+        const cards = document.querySelectorAll('.card');
+        return cards.length > 0 && cards.length <= limit;
+      }, total, { timeout: 5000 });
+      const filtered = await page.locator('.card').count();
+      assert(filtered <= total, `筛选后卡片数不应变多：${filtered} > ${total}`);
+      const tagsText = await page.locator('.card .tag-project').allInnerTexts();
+      assert(
+        tagsText.some((text) => text.includes(label)),
+        `可见卡片里应至少有一张带 #${label}`,
+      );
+
+      await page.locator('.tag-chip-clear').click();
+      await page.waitForFunction((limit) => document.querySelectorAll('.card').length === limit, total, {
+        timeout: 5000,
+      });
+    });
+  } else {
+    process.stdout.write('\n## 标签筛选\n  （跳过：当前数据还没有标签）\n');
+  }
+
   await page.screenshot({ path: path.join(outDir, 'home-desktop.png'), fullPage: true });
 
   // ---------- 在线体验与下载 ----------
@@ -497,6 +533,51 @@ try {
       await adminPage.waitForSelector('.login-card', { timeout: 6000 });
       const cookie = await context.cookies();
       assertEqual(cookie.filter((item) => item.name === 'fh_admin').length, 0, '退出后不应保留会话 cookie');
+      await context.close();
+    });
+    await check('管理页三个 Tab 都能切换并渲染内容', async () => {
+      const context = await browser.newContext({ viewport: { width: 1280, height: 1000 }, locale: 'zh-CN' });
+      const adminPage = await context.newPage();
+      await adminPage.goto(`${base}/admin`, { waitUntil: 'networkidle' });
+      await adminPage.fill('input[type=password]', adminPassword);
+      await adminPage.click('button[type=submit]');
+      await adminPage.waitForSelector('.admin-list-item', { timeout: 10_000 });
+
+      await adminPage.locator('.admin-tab', { hasText: '标签' }).click();
+      await adminPage.waitForSelector('.tag-admin-list', { timeout: 6000 });
+      const tagRows = await adminPage.locator('.tag-admin-list li').count();
+      assert(tagRows > 0, '标签页应至少渲染一行（标签或空状态）');
+
+      await adminPage.locator('.admin-tab', { hasText: '数据' }).click();
+      await adminPage.waitForSelector('.stat-card', { timeout: 8000 });
+      const totals = await adminPage.locator('.stat-card strong').allInnerTexts();
+      assert(totals.length >= 4, `数据总览应有 4 个指标，实际 ${totals.length}`);
+      assert(totals.every((text) => text.trim().length > 0), '指标都应有内容');
+      await adminPage.screenshot({ path: path.join(outDir, 'admin-stats.png'), fullPage: true });
+
+      await adminPage.locator('.admin-tab', { hasText: '项目' }).click();
+      await adminPage.waitForSelector('.editor-card', { timeout: 6000 });
+      await context.close();
+    });
+
+    await check('添加项目弹窗可以打开并校验必填项（不写入数据）', async () => {
+      const context = await browser.newContext({ viewport: { width: 1280, height: 1000 }, locale: 'zh-CN' });
+      const adminPage = await context.newPage();
+      await adminPage.goto(`${base}/admin`, { waitUntil: 'networkidle' });
+      await adminPage.fill('input[type=password]', adminPassword);
+      await adminPage.click('button[type=submit]');
+      await adminPage.waitForSelector('.admin-list-item', { timeout: 10_000 });
+      await adminPage.click('button:has-text("＋ 添加项目")');
+      await adminPage.waitForSelector('.modal-card', { timeout: 6000 });
+      const submit = adminPage.locator('.modal-card button[type=submit]');
+      assert(await submit.isDisabled(), 'slug 和标题都没填时创建按钮应禁用');
+      await adminPage.fill('input[placeholder="my-tool"]', 'not valid slug');
+      await adminPage.fill('.modal-card input[maxlength="120"]', 'x');
+      await submit.click();
+      await adminPage.waitForTimeout(400);
+      assertEqual(await adminPage.locator('.modal-card').count(), 1, 'slug 不合规时浏览器原生校验应拦住提交');
+      await adminPage.click('button:has-text("取消")');
+      await adminPage.waitForSelector('.modal-card', { state: 'detached', timeout: 5000 });
       await context.close();
     });
   } else {

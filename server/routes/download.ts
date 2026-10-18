@@ -10,8 +10,10 @@ import {
   streamFile,
 } from '../http.js';
 import type { Logger } from '../logger.js';
+import type { StatsStore } from '../stats.js';
 
 interface DownloadDeps {
+  stats: StatsStore;
   dataDir: string;
   store: CatalogStore;
   logger: Logger;
@@ -85,6 +87,23 @@ async function handle(req: Request, res: Response, deps: DownloadDeps): Promise<
     deps.logger.error('下载记录中的 storage 越界', { slug, fileName: download.fileName });
     sendText(res, 500, '下载配置异常');
     return;
+  }
+
+  // 埋点：只统计「真的开始下载」的请求（GET，且不是从中间续传的 Range）
+  const range = req.headers.range;
+  const isFullDownload = req.method === 'GET' && (typeof range !== 'string' || range.trim().startsWith('bytes=0-'));
+  if (isFullDownload) {
+    void deps.stats
+      .ready()
+      .then(() => {
+        deps.stats.record({
+          at: new Date().toISOString(),
+          type: 'download',
+          slug,
+          platform: download.platform,
+        });
+      })
+      .catch(() => undefined);
   }
 
   await streamFile(req, res, absPath, {

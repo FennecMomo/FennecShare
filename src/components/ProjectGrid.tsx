@@ -1,9 +1,9 @@
 import { useMemo } from 'react';
-import type { PublicProject } from '../../shared/types';
+import type { PublicProjectView } from '../../shared/types';
 import { ProjectCard } from './ProjectCard';
 
 interface ProjectGridProps {
-  projects: PublicProject[];
+  projects: PublicProjectView[];
   onOpen: (slug: string) => void;
   onShared: (message: string) => void;
   skeletonCount?: number;

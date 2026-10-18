@@ -230,3 +230,66 @@ GET /admin/xxx        → 同上（前端没有路由，统一回同一份 HTML�
 
 图片只按**魔数**判断类型，只接受 PNG / JPEG / WebP，单张上限 12 MiB，每个项目最多 12 张截图。
 `alt` 为空时用「标题 + 序号」兜底，避免出现没有描述的无障碍图片。
+
+## 九、标签与埋点
+
+### 9.1 标签
+
+标签是**登记表 + 引用**的结构，两边都在 `catalog.json` 里，一次原子写入：
+
+```jsonc
+{
+  "tags": [{ "label": "单文件", "createdAt": "2026-10-18T16:00:00.000Z" }],
+  "projects": [{ "slug": "my-tool", "tags": ["单文件"], "...": "..." }]
+}
+```
+
+| 规则 | 说明 |
+| --- | --- |
+| 登记 | 新标签先写进 `tags`，项目才能引用；未登记的标签在写入前就被拒绝 |
+| 大小写 | `DeepSeek` 和 `deepseek` 视为同一个标签，保留第一次登记时的写法 |
+| 格式 | 去首尾空格、内部连续空白折叠成一个空格，单个最多 20 字，最多 30 个 |
+| 删除 | 删标签时会在同一个事务里把所有项目上的引用一起摘掉，并回报影响的项目数 |
+| 旧数据 | 老 catalog 没有 `tags` 字段，读取时自动补成空数组（`normalizeCatalog`） |
+
+前台按标签筛选是「任意命中」（OR），和类型筛选是「同时满足」（AND）。
+
+### 9.2 埋点
+
+统计不落在 catalog 里，而是单独的事件日志 `DATA_DIR/stats/events.jsonl`，一行一个事件：
+
+```json
+{"at":"2026-10-18T16:20:00.000Z","type":"play_click","slug":"paper-notes","source":"dialog"}
+```
+
+| 事件 | 来源 | 口径 |
+| --- | --- | --- |
+| `play_click` | 前台点「在线体验」时上报（`POST /api/stats/event`） | 只记点击，不记打开后停留多久 |
+| `share_click` | 卡片分享按钮、详情里的「复制分享链接」 | 复制成功才上报 |
+| `download` | 下载路由（服务端记录） | 只算 `GET` 且不是从中间续传的 `Range`，`HEAD` 和 `bytes=N-` 不计 |
+
+隐私与限额：
+- 不记 IP、不记 User-Agent、不写 cookie；服务端只在内存里按 IP 做每分钟 120 次的上报限流；
+- 上报接口只接受 `play_click` / `share_click`，项目不存在或已下架时直接丢弃（返回 204，避免脏数据）；
+- 启动时把整个文件扫一遍建立内存聚合，之后读接口是 O(1)；写是串行 append。
+
+聚合结果同时供给两处：
+- 前台 `/api/projects` 每个项目带 `stats: { playClicks, shareClicks, downloads }`；
+- 后台 `/api/admin/stats?days=N` 给总量、按项目、按平台、按天（7/14/30 天）四张表。
+
+> 事件文件不自动归档。按现在的量级（每个点击一行、约 120 字节）一年也就几 MB；
+> 超过 20 万条时会打一条 warn 日志提醒，需要时手工把 `events.jsonl` 挪走即可，聚合会重新计算。
+
+### 9.3 管理页新增的写入路径
+
+| 操作 | 接口 | 版本目录 | catalog |
+| --- | --- | --- | --- |
+| 新建项目 | `POST /api/admin/projects` | 不建（还没有内容） | revision + 1，历史 `create` |
+| 发布/替换试玩包 | `PUT /api/admin/projects/:slug/web` | 新建（复制当前版本后整体替换 `web/`） | revision + 1，历史 `web` |
+| 移除试玩包 | `DELETE /api/admin/projects/:slug/web` | 不动 | revision + 1，历史 `web` |
+| 上传/替换下载包 | `POST /api/admin/projects/:slug/downloads` | 新建（写入 `downloads/`，保留其它内容） | revision + 1，历史 `downloads` |
+| 删除下载包 | `DELETE /api/admin/projects/:slug/downloads/:fileName` | 不动 | revision + 1，历史 `downloads` |
+| 增删标签 | `POST/DELETE /api/admin/tags` | 不动 | revision + 1 |
+
+试玩包上传接受两种输入：单个 `.html`（入口名保留原文件名，只做必要的非法字符清洗）或 `.zip`
+（解压后自动找站点根目录与入口文件，支持「压缩包里多套了一层目录」）。其它内容一律 415。

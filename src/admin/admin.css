@@ -522,3 +522,221 @@ textarea:focus-visible {
     animation-duration: 0.001ms !important;
   }
 }
+
+/* ---------- 管理页 Tab ---------- */
+.admin-tabs {
+  display: flex;
+  gap: 6px;
+  margin: 0 0 16px;
+  border-bottom: 1px solid var(--admin-border);
+}
+
+.admin-tab {
+  padding: 9px 18px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: none;
+  font: inherit;
+  font-weight: 600;
+  color: var(--admin-muted);
+  cursor: pointer;
+}
+
+.admin-tab:hover {
+  color: var(--admin-text);
+}
+
+.admin-tab.is-active {
+  color: var(--admin-accent);
+  border-bottom-color: var(--admin-accent);
+}
+
+.wide-card {
+  width: min(560px, 100%);
+  max-height: 90vh;
+  overflow: auto;
+}
+
+select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--admin-border);
+  border-radius: 10px;
+  background: #fbfdfe;
+  font: inherit;
+  color: inherit;
+}
+
+/* ---------- 下载包 / 标签列表 ---------- */
+.download-admin-list,
+.tag-admin-list,
+.platform-list {
+  list-style: none;
+  margin: 0 0 14px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.download-admin-list li,
+.tag-admin-list li,
+.platform-list li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 10px;
+  border: 1px solid var(--admin-border);
+  border-radius: 10px;
+  background: #fbfdfe;
+  flex-wrap: wrap;
+}
+
+.dl-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.download-upload-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.tag-add-row {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.tag-add-row input {
+  flex: 1;
+}
+
+/* ---------- 数据面板 ---------- */
+.stats-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.stats-head h3 {
+  margin: 0;
+}
+
+.stat-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.stat-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 16px;
+  border: 1px solid var(--admin-border);
+  border-radius: 12px;
+  background: #fbfdfe;
+}
+
+.stat-card strong {
+  font-size: 1.7rem;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.stat-card .small-strong {
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.day-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  height: 160px;
+  padding: 8px 0 0;
+  overflow-x: auto;
+}
+
+.day-bar {
+  flex: 1 0 18px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  height: 100%;
+}
+
+.day-bar-track {
+  flex: 1;
+  width: 100%;
+  display: flex;
+  align-items: flex-end;
+  background: #eef5f9;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.day-bar-fill {
+  width: 100%;
+  background: linear-gradient(180deg, #14a08c, #0f7a6c);
+  border-radius: 6px 6px 0 0;
+  transition: height 0.2s ease;
+}
+
+.day-bar-label {
+  font-size: 0.66rem;
+  color: var(--admin-muted);
+  white-space: nowrap;
+}
+
+.stats-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+
+.stats-table th,
+.stats-table td {
+  text-align: left;
+  padding: 9px 10px;
+  border-bottom: 1px solid var(--admin-border);
+  vertical-align: top;
+}
+
+.stats-table th {
+  font-size: 0.78rem;
+  color: var(--admin-muted);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.stats-table td:nth-child(2),
+.stats-table td:nth-child(3),
+.stats-table td:nth-child(4) {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.stats-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+@media (max-width: 720px) {
+  .stats-table {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+}

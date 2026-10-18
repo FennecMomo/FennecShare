@@ -7,6 +7,7 @@ import { readCatalogFile, writeCatalogAtomic } from './catalog-io.js';
 import { appendHistory, applySnapshot, listHistory, projectState } from './history.js';
 import { PublishError } from './errors.js';
 import { DEFAULT_SUMMARY } from './manifest.js';
+import { alignProjectTags } from './tags.js';
 
 export interface ListEntry {
   slug: string;
@@ -215,6 +216,7 @@ export interface ProjectMetaPatch {
   summary?: string;
   description?: string;
   categories?: string[];
+  tags?: string[];
   displayVersion?: string | null;
   sortOrder?: number;
   demo?: boolean;
@@ -268,6 +270,9 @@ export async function updateProjectMeta(
       if (unknown) throw new PublishError('invalid_request', `未知类型：${unknown}`);
       next.categories = categories as StoredProject['categories'];
     }
+    if (patch.tags !== undefined) {
+      next.tags = alignProjectTags(catalog, patch.tags);
+    }
     if (patch.displayVersion !== undefined) {
       const version = patch.displayVersion === null ? '' : patch.displayVersion.trim();
       if (version.length > 40) throw new PublishError('invalid_request', '版本号最多 40 个字符');
@@ -291,6 +296,7 @@ export async function updateProjectMeta(
       next.summary !== project.summary ||
       next.description !== project.description ||
       next.categories.join(',') !== project.categories.join(',') ||
+      next.tags.join(',') !== (project.tags ?? []).join(',') ||
       next.displayVersion !== project.displayVersion ||
       next.sortOrder !== project.sortOrder ||
       next.demo !== project.demo ||

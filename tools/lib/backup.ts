@@ -97,6 +97,12 @@ export async function backupData(
       await walk(projectRoot);
     }
 
+    // 埋点文件也一起备份（不备份 admin/ 下的密码派生值：那是独立的凭据，不该跟着数据回滚）
+    const statsFile = path.join(config.dataDir, 'stats', 'events.jsonl');
+    if (fs.existsSync(statsFile)) {
+      await copyOne(statsFile, path.join('stats', 'events.jsonl'));
+    }
+
     const manifest: BackupManifest = {
       schemaVersion: 1,
       createdAt: new Date().toISOString(),

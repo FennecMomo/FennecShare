@@ -751,6 +751,249 @@ async function main(): Promise<void> {
       assertEqual(newLogin.status, 200, '新密码应可用');
     });
 
+    // ---------- 管理页面：标签 / 新建项目 / 发布新版本 / 埋点 ----------
+    const adminFetch = (path: string, init: RequestInit = {}) =>
+      fetch(`${base}${path}`, {
+        ...init,
+        headers: { ...adminHeaders, cookie: sessionCookie, ...(init.headers as Record<string, string> | undefined) },
+      });
+
+    await check('标签：新增、幂等、删除时从项目上摘掉', async () => {
+      const created = await adminFetch('/api/admin/tags', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ label: '自测标签' }),
+      });
+      assertEqual(created.status, 200, '新增标签状态');
+      const createdBody = (await created.json()) as { tag: { label: string } };
+      assertEqual(createdBody.tag.label, '自测标签', '标签名');
+
+      const again = await adminFetch('/api/admin/tags', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ label: '自测标签' }),
+      });
+      assertEqual(again.status, 200, '重复新增应幂等');
+
+      let catalog = await readCatalogFile(dataDir);
+      assertEqual(catalog.tags.filter((tag) => tag.label === '自测标签').length, 1, '登记表里只有一条');
+
+      const overview = await adminFetch('/api/admin/tags');
+      const overviewBody = (await overview.json()) as { tags: Array<{ label: string; projectCount: number }> };
+      assert(overviewBody.tags.some((tag) => tag.label === '自测标签'), '标签总览应包含新标签');
+
+      const remove = await adminFetch(`/api/admin/tags/${encodeURIComponent('自测标签')}`, { method: 'DELETE' });
+      assertEqual(remove.status, 200, '删除标签状态');
+      catalog = await readCatalogFile(dataDir);
+      assertEqual(catalog.tags.some((tag) => tag.label === '自测标签'), false, '登记表里应已删除');
+      assertEqual(
+        catalog.projects.every((project) => !project.tags.includes('自测标签')),
+        true,
+        '项目上不应残留该标签',
+      );
+    });
+
+    await check('新建项目：出现在 catalog，未上架时公开接口看不到', async () => {
+      await adminFetch('/api/admin/tags', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ label: '自测' }),
+      });
+
+      const created = await adminFetch('/api/admin/projects', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          slug: 'admin-created',
+          title: '管理页建的项目',
+          summary: '来自管理页的测试项目',
+          categories: ['web'],
+          tags: ['自测'],
+          published: false,
+        }),
+      });
+      assertEqual(created.status, 201, '创建状态');
+      const body = (await created.json()) as { slug: string };
+      assertEqual(body.slug, 'admin-created', 'slug');
+
+      const catalog = await readCatalogFile(dataDir);
+      const project = findProject(catalog, 'admin-created');
+      assert(project, 'catalog 里应有新项目');
+      assertEqual(project?.published, false, '默认未上架');
+      assertEqual(project?.tags.join(','), '自测', '标签');
+      assertEqual(project?.web, null, '还没有试玩包');
+      assertEqual(project?.releaseHistory.length, 0, '新建项目还没有发布版本');
+
+      const publicList = await fetch(`${base}/api/projects`);
+      const publicBody = (await publicList.json()) as { projects: Array<{ slug: string }>; tags: string[] };
+      assertEqual(publicBody.projects.some((item) => item.slug === 'admin-created'), false, '未上架不应出现在公开列表');
+      assert(publicBody.tags.includes('自测'), '公开接口应返回标签表');
+
+      const publish = await adminFetch('/api/admin/projects/admin-created', {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ published: true }),
+      });
+      assertEqual(publish.status, 200, '上架状态');
+    });
+
+    await check('一键发布试玩（单文件 HTML）：入口保留原文件名且能打开', async () => {
+      const html = '<!doctype html><html><head><meta charset="utf-8"><title>自测页</title></head><body><h1>ADMIN-HTML-MARK</h1></body></html>';
+      const response = await adminFetch('/api/admin/projects/admin-created/web', {
+        method: 'PUT',
+        headers: { 'content-type': 'text/html; charset=utf-8', 'x-file-name': encodeURIComponent('演示页.html') },
+        body: html,
+      });
+      assertEqual(response.status, 200, '上传状态');
+      const body = (await response.json()) as { entry: string; releaseId: string };
+      assertEqual(body.entry, '演示页.html', '入口应保留原文件名');
+
+      const play = await fetch(`${base}/play/admin-created/`, { redirect: 'manual' });
+      assertEqual(play.status, 302, '试玩入口重定向');
+      const location = play.headers.get('location') ?? '';
+      const page = await fetch(`${base}${location}`);
+      assertEqual(page.status, 200, '试玩页面状态');
+      const text = await page.text();
+      assert(text.includes('ADMIN-HTML-MARK'), '页面内容应是刚上传的 HTML');
+
+      const catalog = await readCatalogFile(dataDir);
+      const project = findProject(catalog, 'admin-created');
+      assertEqual(project?.web?.releaseId, body.releaseId, 'catalog 指向新版本');
+    });
+
+    await check('一键发布试玩（ZIP）：自动识别入口', async () => {
+      const zip = buildZip([
+        { name: 'site/index.html', content: '<!doctype html><html><body><h1>ZIP-MARK</h1><script src="app.js"></script></body></html>' },
+        { name: 'site/app.js', content: 'console.log("zip")' },
+      ]);
+      const response = await adminFetch('/api/admin/projects/admin-created/web', {
+        method: 'PUT',
+        headers: { 'content-type': 'application/zip' },
+        body: zip,
+      });
+      assertEqual(response.status, 200, '上传状态');
+      const body = (await response.json()) as { entry: string; fileCount: number };
+      assertEqual(body.entry, 'index.html', 'ZIP 入口');
+      assertEqual(body.fileCount, 2, 'ZIP 文件数');
+
+      const page = await fetch(`${base}/play/admin-created/`);
+      const text = await page.text();
+      assert(text.includes('ZIP-MARK'), '页面内容应来自 ZIP');
+
+      const catalog = await readCatalogFile(dataDir);
+      const project = findProject(catalog, 'admin-created');
+      assertEqual(project?.web?.entry, 'index.html', 'catalog 入口');
+      assertEqual(project?.releaseHistory.some((entry) => entry.parts.includes('web')), true, '应有 web 历史');
+    });
+
+    await check('非 HTML/ZIP 内容被拒绝', async () => {
+      const response = await adminFetch('/api/admin/projects/admin-created/web', {
+        method: 'PUT',
+        headers: { 'content-type': 'application/octet-stream' },
+        body: Buffer.from('just some text, not a page', 'utf8'),
+      });
+      assertEqual(response.status, 415, '状态');
+    });
+
+    await check('上传下载包：可下载、可覆盖、平台记录正确', async () => {
+      const first = Buffer.from('PK\u0003\u0004 假的下载内容 v1', 'utf8');
+      const upload = await adminFetch('/api/admin/projects/admin-created/downloads', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/octet-stream',
+          'x-file-name': encodeURIComponent('演示包-1.0.0.zip'),
+          'x-platform': 'android',
+          'x-version': encodeURIComponent('1.0.0'),
+        },
+        body: first,
+      });
+      assertEqual(upload.status, 200, '上传状态');
+      const uploadBody = (await upload.json()) as { replaced: boolean; download: { publicUrl: string; platform: string } };
+      assertEqual(uploadBody.replaced, false, '首次上传不算替换');
+      assertEqual(uploadBody.download.platform, 'android', '平台');
+
+      const download = await fetch(`${base}${uploadBody.download.publicUrl}`);
+      assertEqual(download.status, 200, '下载状态');
+      const bytes = Buffer.from(await download.arrayBuffer());
+      assert(bytes.equals(first), '下载内容应与上传一致');
+
+      const second = Buffer.from('PK\u0003\u0004 假的下载内容 v2 更长一点', 'utf8');
+      const replace = await adminFetch('/api/admin/projects/admin-created/downloads', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/octet-stream',
+          'x-file-name': encodeURIComponent('演示包-1.0.0.zip'),
+          'x-platform': 'android',
+        },
+        body: second,
+      });
+      assertEqual(replace.status, 200, '替换状态');
+      const replaceBody = (await replace.json()) as { replaced: boolean };
+      assertEqual(replaceBody.replaced, true, '同名文件应走替换');
+
+      const after = await fetch(`${base}${uploadBody.download.publicUrl}`);
+      const afterBytes = Buffer.from(await after.arrayBuffer());
+      assert(afterBytes.equals(second), '替换后下载内容应更新');
+
+      const catalog = await readCatalogFile(dataDir);
+      const project = findProject(catalog, 'admin-created');
+      assertEqual(project?.downloads.length, 1, '同名文件只保留一条记录');
+      assertEqual(project?.downloads[0]?.isDefault, true, '第一个下载包应自动成为默认');
+    });
+
+    await check('埋点：分享/试玩上报后公开接口与后台都能看到', async () => {
+      const report = (type: string) =>
+        fetch(`${base}/api/stats/event`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ type, slug: 'admin-created', source: 'selftest' }),
+        });
+
+      const share = await report('share_click');
+      assertEqual(share.status, 204, '分享上报状态');
+      const play = await report('play_click');
+      assertEqual(play.status, 204, '试玩上报状态');
+      const bogus = await report('not_a_type');
+      assertEqual(bogus.status, 400, '未知类型应拒绝');
+
+      const publicList = await fetch(`${base}/api/projects`);
+      const publicBody = (await publicList.json()) as {
+        projects: Array<{ slug: string; stats: { playClicks: number; shareClicks: number; downloads: number } }>;
+      };
+      const target = publicBody.projects.find((item) => item.slug === 'admin-created');
+      assert(target, '公开列表里应有这个项目');
+      assertEqual(target?.stats.shareClicks, 1, '分享计数');
+      assertEqual(target?.stats.playClicks, 1, '试玩计数');
+      assert((target?.stats.downloads ?? 0) >= 2, '下载计数应包含前面两次下载');
+
+      const stats = await adminFetch('/api/admin/stats?days=14');
+      assertEqual(stats.status, 200, '后台数据接口');
+      const statsBody = (await stats.json()) as {
+        totals: { playClicks: number; shareClicks: number; downloads: number };
+        byPlatform: Record<string, number>;
+        byProject: Record<string, { downloads: number }>;
+      };
+      assert(statsBody.totals.shareClicks >= 1, '总分享数');
+      assert(statsBody.totals.downloads >= 2, '总下载数');
+      assert((statsBody.byPlatform.android ?? 0) >= 3, '平台分布里应有 android 下载');
+      assert((statsBody.byProject['admin-created']?.downloads ?? 0) >= 2, '按项目统计');
+    });
+
+    await check('未登录不能新建项目或上传试玩包', async () => {
+      const create = await fetch(`${base}/api/admin/projects`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', ...adminHeaders },
+        body: JSON.stringify({ slug: 'nope', title: 'nope', categories: ['web'] }),
+      });
+      assertEqual(create.status, 401, '创建应 401');
+
+      const upload = await fetch(`${base}/api/admin/projects/admin-created/web`, {
+        method: 'PUT',
+        headers: { 'content-type': 'text/html', ...adminHeaders },
+        body: '<html></html>',
+      });
+      assertEqual(upload.status, 401, '上传应 401');
+    });
     await check('弱密码被拒绝', async () => {
       const response = await fetch(`${base}/api/admin/password`, {
         method: 'POST',

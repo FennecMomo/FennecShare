@@ -1,6 +1,6 @@
 import express, { type NextFunction, type Request, type Response, type Router } from 'express';
 import path from 'node:path';
-import type { AppConfig } from '../config.js';
+import type { AppConfig, PublisherConfig } from '../config.js';
 import type { Logger } from '../logger.js';
 import { sendJson, sendText, streamFile } from '../http.js';
 import { checkPasswordPolicy, readAuth, verifyPassword, writeAuth } from '../admin/auth.js';
@@ -16,6 +16,13 @@ import { readCatalogFile } from '../../tools/lib/catalog-io.js';
 import { isPublishError } from '../../tools/lib/errors.js';
 import { updateProjectMeta, type ProjectMetaPatch } from '../../tools/lib/manage.js';
 import { MAX_MEDIA_BYTES, updateProjectMedia } from '../../tools/lib/media.js';
+import { createProject } from '../../tools/lib/create.js';
+import { addTag, removeTag, tagOverview } from '../../tools/lib/tags.js';
+import { clearProjectWeb, updateProjectWeb } from '../../tools/lib/web.js';
+import { removeProjectDownload, upsertProjectDownload } from '../../tools/lib/downloads.js';
+import { loadLimits } from '../../tools/lib/manifest.js';
+import { PLATFORMS, type Platform } from '../../shared/types.js';
+import type { StatsStore } from '../stats.js';
 
 const LOGIN_WINDOW_MS = 10 * 60 * 1000;
 const LOGIN_MAX_FAILURES = 8;
@@ -26,6 +33,7 @@ interface AdminDeps {
   config: AppConfig;
   logger: Logger;
   sessions: SessionStore;
+  stats: StatsStore;
 }
 
 interface LoginAttempt {
@@ -197,6 +205,7 @@ export function createAdminApiRouter(deps: AdminDeps): Router {
           summary: project.summary,
           description: project.description,
           categories: project.categories,
+          tags: project.tags,
           demo: project.demo,
           sortOrder: project.sortOrder,
           displayVersion: project.displayVersion,
@@ -232,6 +241,9 @@ export function createAdminApiRouter(deps: AdminDeps): Router {
       if (typeof body.description === 'string') patch.description = body.description;
       if (Array.isArray(body.categories)) {
         patch.categories = body.categories.filter((item: unknown): item is string => typeof item === 'string');
+      }
+      if (Array.isArray(body.tags)) {
+        patch.tags = body.tags.filter((item: unknown): item is string => typeof item === 'string');
       }
       if (body.displayVersion === null || typeof body.displayVersion === 'string') {
         patch.displayVersion = body.displayVersion;
@@ -363,11 +375,187 @@ export function createAdminApiRouter(deps: AdminDeps): Router {
     }
   });
 
+  // ---------- 标签 ----------
+  router.get('/tags', async (req, res, next) => {
+    try {
+      if (!requireSession(req, res)) return;
+      const overview = await tagOverview(engineConfig(deps));
+      sendJson(res, 200, overview);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.post('/tags', async (req, res, next) => {
+    try {
+      if (!requireSession(req, res)) return;
+      const label = typeof req.body?.label === 'string' ? req.body.label : '';
+      const result = await addTag(engineConfig(deps), label);
+      deps.logger.info('管理页面新增标签', { label: result.tag.label, revision: result.revision });
+      sendJson(res, 200, { ok: true, revision: result.revision, tag: result.tag });
+    } catch (error) {
+      if (handleAdminError(error, res)) return;
+      next(error);
+    }
+  });
+
+  router.delete('/tags/:label', async (req, res, next) => {
+    try {
+      if (!requireSession(req, res)) return;
+      const label = decodeURIComponent(req.params.label ?? '');
+      const result = await removeTag(engineConfig(deps), label);
+      deps.logger.info('管理页面删除标签', { label: result.removed, affected: result.affectedProjects.length });
+      sendJson(res, 200, { ok: true, revision: result.revision, removed: result.removed, affectedProjects: result.affectedProjects });
+    } catch (error) {
+      if (handleAdminError(error, res)) return;
+      next(error);
+    }
+  });
+
+  // ---------- 新建项目 ----------
+  router.post('/projects', async (req, res, next) => {
+    try {
+      if (!requireSession(req, res)) return;
+      const body = req.body ?? {};
+      const result = await createProject(engineConfig(deps), {
+        slug: typeof body.slug === 'string' ? body.slug : '',
+        title: typeof body.title === 'string' ? body.title : '',
+        summary: typeof body.summary === 'string' ? body.summary : '',
+        description: typeof body.description === 'string' ? body.description : '',
+        categories: Array.isArray(body.categories) ? body.categories.filter((item: unknown): item is string => typeof item === 'string') : [],
+        tags: Array.isArray(body.tags) ? body.tags.filter((item: unknown): item is string => typeof item === 'string') : [],
+        sortOrder: typeof body.sortOrder === 'number' ? body.sortOrder : 0,
+        displayVersion: typeof body.displayVersion === 'string' ? body.displayVersion : null,
+        demo: body.demo === true,
+        published: body.published !== false,
+      });
+      deps.logger.info('管理页面新建项目', { slug: result.slug, revision: result.revision });
+      sendJson(res, 201, { ok: true, message: result.message, revision: result.revision, slug: result.slug });
+    } catch (error) {
+      if (handleAdminError(error, res)) return;
+      next(error);
+    }
+  });
+
+  // ---------- 发布新版本：试玩包 ----------
+  const rawWeb = express.raw({
+    type: ['application/zip', 'application/x-zip-compressed', 'text/html', 'application/octet-stream'],
+    limit: loadLimits().maxZipBytes,
+  });
+
+  router.put('/projects/:slug/web', rawWeb, async (req, res, next) => {
+    try {
+      if (!requireSession(req, res)) return;
+      if (!Buffer.isBuffer(req.body) || req.body.length === 0) {
+        sendJson(res, 400, {
+          error: { code: 'invalid_upload', message: '请上传 .html 文件或 ZIP 包（Content-Type: application/zip / text/html）' },
+        });
+        return;
+      }
+      const fileName = decodeHeaderName(req.get('x-file-name')) ?? 'index.html';
+      const result = await updateProjectWeb(engineConfig(deps), req.params.slug ?? '', {
+        fileName,
+        buffer: req.body,
+      });
+      deps.logger.info('管理页面发布试玩包', { slug: result.slug, releaseId: result.releaseId, entry: result.entry });
+      sendJson(res, 200, {
+        ok: true,
+        message: result.message,
+        releaseId: result.releaseId,
+        entry: result.entry,
+        revision: result.revision,
+        fileCount: result.fileCount,
+        totalBytes: result.totalBytes,
+        warnings: result.warnings,
+      });
+    } catch (error) {
+      if (handleAdminError(error, res)) return;
+      next(error);
+    }
+  });
+
+  router.delete('/projects/:slug/web', async (req, res, next) => {
+    try {
+      if (!requireSession(req, res)) return;
+      const result = await clearProjectWeb(engineConfig(deps), req.params.slug ?? '');
+      sendJson(res, 200, { ok: true, revision: result.revision, message: '试玩包已移除' });
+    } catch (error) {
+      if (handleAdminError(error, res)) return;
+      next(error);
+    }
+  });
+
+  // ---------- 发布新版本：下载包 ----------
+  const rawDownload = express.raw({ type: () => true, limit: loadLimits().maxDownloadBytes });
+
+  router.post('/projects/:slug/downloads', rawDownload, async (req, res, next) => {
+    try {
+      if (!requireSession(req, res)) return;
+      if (!Buffer.isBuffer(req.body) || req.body.length === 0) {
+        sendJson(res, 400, { error: { code: 'invalid_upload', message: '上传内容为空' } });
+        return;
+      }
+      const fileName = decodeHeaderName(req.get('x-file-name'));
+      if (!fileName) {
+        sendJson(res, 400, { error: { code: 'invalid_upload', message: '缺少 x-file-name 头（文件名）' } });
+        return;
+      }
+      const platformRaw = (req.get('x-platform') ?? 'other').trim();
+      const platform = (PLATFORMS as readonly string[]).includes(platformRaw) ? (platformRaw as Platform) : 'other';
+      const result = await upsertProjectDownload(engineConfig(deps), req.params.slug ?? '', {
+        fileName,
+        buffer: req.body,
+        platform,
+        version: decodeHeaderName(req.get('x-version')),
+        isDefault: req.get('x-default') === '1',
+      });
+      deps.logger.info('管理页面上传下载包', { slug: result.slug, fileName, releaseId: result.releaseId });
+      sendJson(res, 200, {
+        ok: true,
+        message: result.message,
+        replaced: result.replaced,
+        releaseId: result.releaseId,
+        revision: result.revision,
+        download: result.download,
+      });
+    } catch (error) {
+      if (handleAdminError(error, res)) return;
+      next(error);
+    }
+  });
+
+  router.delete('/projects/:slug/downloads/:fileName', async (req, res, next) => {
+    try {
+      if (!requireSession(req, res)) return;
+      const fileName = decodeURIComponent(req.params.fileName ?? '');
+      const result = await removeProjectDownload(engineConfig(deps), req.params.slug ?? '', fileName);
+      sendJson(res, 200, { ok: true, revision: result.revision, removed: result.removed });
+    } catch (error) {
+      if (handleAdminError(error, res)) return;
+      next(error);
+    }
+  });
+
+  // ---------- 数据分析 ----------
+  router.get('/stats', async (req, res, next) => {
+    try {
+      if (!requireSession(req, res)) return;
+      await deps.stats.ready();
+      const days = Number(req.query.days);
+      const summary = deps.stats.summary(Number.isFinite(days) ? days : 14);
+      const catalog = await readCatalogFile(deps.config.dataDir);
+      const titles = Object.fromEntries(catalog.projects.map((project) => [project.slug, project.title]));
+      sendJson(res, 200, { ...summary, titles });
+    } catch (error) {
+      next(error);
+    }
+  });
+
   // JSON 解析失败等由 Express 抛出的错误，统一回成 JSON
   router.use((error: unknown, _req: Request, res: Response, next: NextFunction) => {
     const status = typeof (error as { status?: unknown })?.status === 'number' ? (error as { status: number }).status : null;
     if (status === 413) {
-      sendJson(res, 413, { error: { code: 'too_large', message: `图片过大，上限 ${MAX_MEDIA_BYTES} 字节` } });
+      sendJson(res, 413, { error: { code: 'too_large', message: '上传内容超过大小上限' } });
       return;
     }
     if (status === 400) {
@@ -378,6 +566,28 @@ export function createAdminApiRouter(deps: AdminDeps): Router {
   });
 
   return router;
+}
+
+function engineConfig(deps: AdminDeps): PublisherConfig {
+  return { dataDir: deps.config.dataDir, publicBaseUrl: deps.config.publicBaseUrl, logLevel: deps.config.logLevel };
+}
+
+/** 头部里的文件名/版本号用百分号编码传，避免中文与空格在 HTTP 头里出问题。 */
+function decodeHeaderName(raw: string | undefined): string | null {
+  if (!raw) return null;
+  try {
+    const value = decodeURIComponent(raw).trim();
+    return value.length > 0 ? value : null;
+  } catch {
+    return raw.trim() || null;
+  }
+}
+
+function handleAdminError(error: unknown, res: Response): boolean {
+  if (!isPublishError(error)) return false;
+  const status = error.code === 'project_not_found' ? 404 : error.code === 'invalid_upload' ? 415 : 400;
+  sendJson(res, status, { error: { code: error.code, message: error.message } });
+  return true;
 }
 
 function handleMediaError(error: unknown, res: Response): boolean {

@@ -32,6 +32,22 @@ export const PLATFORM_LABELS: Record<Platform, string> = {
 export const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 export const SLUG_MAX_LENGTH = 64;
 
+/** 标签：自由文本，但必须先在 catalog 的标签表里登记。 */
+export const TAG_MAX_LENGTH = 20;
+export const TAG_MAX_COUNT = 30;
+
+export interface TagRecord {
+  label: string;
+  createdAt: string;
+}
+
+/** 展示用的项目计数（来自埋点，不进 catalog）。 */
+export interface ProjectStats {
+  playClicks: number;
+  shareClicks: number;
+  downloads: number;
+}
+
 /** 一张图片（封面或截图）。url 为同源相对路径，带 releaseId，可长期缓存。 */
 export interface MediaAsset {
   url: string;
@@ -95,6 +111,8 @@ export interface StoredProject {
   summary: string;
   description: string;
   categories: Category[];
+  /** 标签（自由文本，取自 catalog.tags 的登记表）。 */
+  tags: string[];
   cover: MediaAsset | null;
   screenshots: MediaAsset[];
   createdAt: string;
@@ -120,6 +138,7 @@ export interface PublicProject {
   summary: string;
   description: string;
   categories: Category[];
+  tags: string[];
   cover: MediaAsset | null;
   screenshots: MediaAsset[];
   createdAt: string;
@@ -133,10 +152,17 @@ export interface PublicProject {
   downloads: PublicDownload[];
 }
 
+/** 公开 API 返回的项目：catalog 字段 + 埋点计数。 */
+export interface PublicProjectView extends PublicProject {
+  stats: ProjectStats;
+}
+
 export interface CatalogFile {
   schemaVersion: number;
   revision: number;
   generatedAt: string;
+  /** 标签登记表：项目的 tags 只能取这里的值。 */
+  tags: TagRecord[];
   projects: StoredProject[];
 }
 
@@ -145,7 +171,9 @@ export interface PublicCatalogResponse {
   revision: number;
   generatedAt: string;
   serverTime: string;
-  projects: PublicProject[];
+  /** 全部标签（按登记顺序），前端据此渲染筛选条。 */
+  tags: string[];
+  projects: PublicProjectView[];
 }
 
 export interface ApiError {

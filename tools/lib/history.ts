@@ -2,7 +2,15 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { MediaAsset, StoredDownload, StoredProject, WebRelease } from '../../shared/types.js';
 
-export type HistoryAction = 'publish' | 'unpublish' | 'rollback' | 'media' | 'meta';
+export type HistoryAction =
+  | 'publish'
+  | 'unpublish'
+  | 'rollback'
+  | 'create'
+  | 'media'
+  | 'meta'
+  | 'web'
+  | 'downloads';
 
 /** 一次状态快照：足够把项目完整恢复到当时的样子。 */
 export interface ProjectStateSnapshot {
@@ -10,6 +18,7 @@ export interface ProjectStateSnapshot {
   summary: string;
   description: string;
   categories: StoredProject['categories'];
+  tags: string[];
   cover: MediaAsset | null;
   screenshots: MediaAsset[];
   displayVersion: string | null;
@@ -38,6 +47,7 @@ export function projectState(project: StoredProject): ProjectStateSnapshot {
     summary: project.summary,
     description: project.description,
     categories: project.categories,
+    tags: project.tags ?? [],
     cover: project.cover,
     screenshots: project.screenshots,
     displayVersion: project.displayVersion,
@@ -59,6 +69,7 @@ export function applySnapshot(project: StoredProject, snapshot: ProjectStateSnap
     summary: snapshot.summary,
     description: snapshot.description,
     categories: snapshot.categories,
+    tags: snapshot.tags ?? [],
     cover: snapshot.cover,
     screenshots: snapshot.screenshots,
     displayVersion: snapshot.displayVersion,
