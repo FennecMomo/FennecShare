@@ -240,3 +240,41 @@ cd fennec-share && bash deploy/deploy.sh --source "$PWD"
 ```
 
 代码回滚不会动数据目录；如果新版本改坏了 catalog 结构，再用 `restore` 回退数据。
+
+## 十二、初始化 / 重设管理密码
+
+`/admin` 在密码文件不存在时会直接拒绝登录（返回 503），所以部署完代码后要设一次密码。
+
+```bash
+cd /home/ubuntu/dev-projects/fennec-share
+export DATA_DIR=/home/ubuntu/fennec-share-data
+node dist/tools/admin.js set-password --password '<新密码>'   # ≥ 8 位，含字母与数字
+node dist/tools/admin.js status                                 # 只显示算法与更新时间
+```
+
+如果不想在命令行里出现明文，可以本地生成派生值再拷过去：
+
+```bash
+# 本地（Windows / WSL 均可）
+node dist/tools/admin.js set-password --password '<新密码>' --out ./admin-auth.json
+
+# 服务器
+sudo install -d -m 700 -o ubuntu -g ubuntu /home/ubuntu/fennec-share-data/admin
+sudo install -m 600 -o ubuntu -g ubuntu ./admin-auth.json /home/ubuntu/fennec-share-data/admin/auth.json
+```
+
+要点：
+
+- `auth.json` 必须属于服务运行用户（默认 `ubuntu`），权限 600；`DATA_DIR/admin` 目录 700。
+- 改密码后**不需要重启**：每次登录都会重新读文件。改完会把其它会话踢掉。
+- 自助改密码走管理页右上角「修改密码」，无需登录服务器。
+
+部署后自检（无需密码也能做）：
+
+```bash
+curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8770/admin          # 200
+curl -s http://127.0.0.1:8770/api/admin/session                              # {"authenticated":false,...}
+curl -s -o /dev/null -w '%{http_code}\n' -X POST http://127.0.0.1:8770/api/admin/login \
+  -H 'content-type: application/json' -H 'x-fennec-admin: 1' -d '{"password":"wrong"}'   # 401
+ls -l /home/ubuntu/fennec-share-data/admin/auth.json                          # -rw------- ubuntu
+```

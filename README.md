@@ -27,9 +27,11 @@
 | 截图浏览 | 多图切换（缩略图 / 左右箭头 / 方向键 / 计数器），单图损坏不影响其它图 |
 | 在线试玩 | `/play/<slug>/` 稳定入口 → 302 到当前版本的独立目录，静态资源按内容不可变长缓存 |
 | 下载 | 流式输出，支持 `Range` / `HEAD` / `ETag` / `Last-Modified`，`Content-Disposition` 正确处理中文与空格，catalog 里带 SHA-256 |
+| 分享 | 每张卡片右上角「分享」按钮：复制带 ?p=<slug> 的链接，对方打开后自动弹出该项目并同步地址栏 |
 | 状态处理 | 首次加载骨架屏、接口失败 + 重试、空列表、筛选无结果；发布后刷新页面即见新内容，无需重启 |
 | 安全 | 站点页面带 CSP 与 `X-Frame-Options: DENY`；试玩内容不套 CSP（否则大量现成页面会挂）；路径穿越、未登记文件、`.catalog.json` 一律 404 |
 | 发布 | 校验、暂存、原子替换 catalog、写锁、幂等、历史快照、回滚、下架、备份恢复 |
+| 管理后台 | /admin 密码登录：改项目信息、上传封面/截图、改密码；复用发布事务（加锁 + 原子换 catalog + 保留旧版本） |
 
 ## 快速开始
 
@@ -41,7 +43,7 @@ npm run dev            # 开发模式：API(8787) + Vite(5173)，带 /api /play 
 npm run build          # 类型检查 + 构建前端到 dist/web + 构建服务端到 dist/server
 npm start              # 生产模式，默认 http://127.0.0.1:8787/
 npm run seed:demo      # 导入 3 个示例项目（都带「示例」标记）
-npm run selftest       # 36 项集成自测：发布事务 + 真实 HTTP 断言
+npm run selftest       # 48 项集成自测：发布事务 + 真实 HTTP 断言 + 管理接口
 npm run verify         # build + selftest 一条龙
 ```
 
@@ -50,8 +52,8 @@ Windows 上如果 `npm` 被 PowerShell 执行策略拦住，用 `npm.cmd`。
 ## 目录结构
 
 ```
-server/             Express 服务端（路由、静态、流式下载、catalog 缓存）
-src/                React 前端（首页、筛选、卡片、详情弹窗）
+server/             Express 服务端（路由、静态、流式下载、catalog 缓存、管理接口与鉴权）
+src/                React 前端（首页、筛选、卡片、详情弹窗）+ src/admin 管理页面
 shared/             前后端共用的类型与 catalog 校验
 tools/              发布 CLI（publish.ts + lib/*）与自测
 demo/               示例项目：真实可交互的静态包 + manifest
@@ -115,6 +117,34 @@ node dist/tools/publish.js cleanup                     # 清理 staging 残留
 
 全部命令都支持 `--json`，退出码 0 成功 / 1 失败 / 2 输入不合法。
 
+## 管理后台
+
+浏览器打开 `/admin`（生产就是 `https://share.fennecmomo.top/admin`）即可管理项目，不需要另开服务。
+
+| 能力 | 说明 |
+| --- | --- |
+| 登录 | 密码以 scrypt 派生值存在 `DATA_DIR/admin/auth.json`（600），不存明文；会话是 HttpOnly + SameSite=Strict cookie，12 小时过期 |
+| 项目信息 | 标题、卡片简介、详细介绍、类型、排序值、展示版本号、是否示例、上架/下架 |
+| 图片 | 上传/替换/移除封面，添加/删除截图；只接受 PNG / JPEG / WebP（按魔数校验），单张上限 12 MiB |
+| 改密码 | 需要当前密码；改完踢掉其它设备上的会话 |
+| 一致性 | 元信息改动只 +1 revision；图片改动会生成新的不可变版本目录，旧版本保留可回滚 |
+
+初始化或重设密码（服务器上执行，密码只以派生值落盘）：
+
+```bash
+node dist/tools/admin.js set-password --password '<新密码>'   # 至少 8 位，含字母与数字
+node dist/tools/admin.js status
+```
+
+也可以在本地生成后拷过去：
+
+```bash
+node dist/tools/admin.js set-password --password '<新密码>' --out ./admin-auth.json
+# 服务器上：sudo install -m 600 -o <服务用户> -g <服务用户> ./admin-auth.json "$DATA_DIR/admin/auth.json"
+```
+
+> 仓库里不写任何密码；`ADMIN_PASSWORD` 只是 `tools/browser-check.mjs` 验收管理页面时读的环境变量。
+
 ## 文档
 
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)：请求链路、数据模型、发布事务、安全边界
@@ -125,7 +155,9 @@ node dist/tools/publish.js cleanup                     # 清理 staging 残留
 
 ## 已知限制
 
-- 没有登录、上传、评论、管理后台：发布只能通过 CLI 在服务器上执行。
+- 管理后台是单账号密码登录，没有多用户、审计日志和二步验证；仓库里不含任何密码，部署后必须自己设一次。
+- 管理页上传图片会把当前版本目录整份复制成新版本，项目体积很大（几百 MB）时这一步会慢一些。
+- 评论、多人协作、在线编辑项目源码仍然没有：批量发布还是走 CLI。
 - 不做在线查毒：EXE / APK 只是原样托管，下载前的安全性由发布者负责（catalog 里公开 SHA-256 供校验）。
 - 下载走单进程流式输出，没有 CDN 和断点续传管理；服务器出口带宽有限时大文件会慢。
 - `Range` 按 RFC 7233 的宽松策略处理：语法错误或一次多段的范围请求直接返回 200 全量，不返回 416。

@@ -180,3 +180,53 @@ ready + 有筛选 + 过滤后为空 ──> 筛选空状态面板（一键清空
 - 详情弹窗用原生 `<dialog>` + `showModal()`：焦点陷阱、`Esc`、焦点归位都是浏览器实现，
   比手写更可靠；遮罩点击通过比较 `event.target === dialog` 判断。
 - 打开的弹窗里如果项目在刷新后消失（比如被下架），会自动关闭，不会留下悬空面板。
+
+## 八、管理后台（`/admin`）
+
+### 8.1 请求链路
+
+```
+GET /admin            → 管理页中间件（CSP / no-store / noindex）→ dist/web/admin.html
+GET /admin/xxx        → 同上（前端没有路由，统一回同一份 HTML）
+/api/admin/**         → 管理 API 路由（先于 /api 挂载）
+其余路径              → 与展示站相同的处理
+```
+
+管理页与展示站共用一套构建产物：Vite 两个入口（`index.html`、`admin.html`），
+资源仍在 `/assets/**`，所以不需要第二个服务、第二个端口或额外进程。
+
+### 8.2 认证
+
+| 环节 | 做法 |
+| --- | --- |
+| 密码存储 | `DATA_DIR/admin/auth.json`：`scrypt(N=16384,r=8,p=1,keylen=64)` + 16 字节随机盐，权限 600；文件里没有明文 |
+| 校验 | `timingSafeEqual` 比较派生值；密码策略为 ≥ 8 位且同时含字母与数字 |
+| 会话 | 进程内 `Map`，32 字节随机 token，12 小时过期；cookie 为 `HttpOnly; SameSite=Strict; Path=/`，HTTPS 下追加 `Secure` |
+| 重启 | 会话不落盘，服务重启后需要重新登录（代价小、泄露面小） |
+| 限流 | 同一个 IP 10 分钟内失败 8 次返回 429，并给 `Retry-After` |
+| 防跨站 | 写操作必须带 `x-fennec-admin: 1` 自定义头；同时校验 `Origin` 的 host 与 `Host` 一致；再叠加 `SameSite=Strict` |
+| 改密码 | 需要当前密码，写入新盐新派生值；成功后销毁除当前会话外的所有 token |
+
+密码初始化/重设走 `tools/admin.ts` 命令行，密码不会出现在仓库、环境文件或日志里。
+
+### 8.3 管理操作如何落盘
+
+| 操作 | 是否新建版本目录 | catalog |
+| --- | --- | --- |
+| 改标题/简介/详情/类型/排序/版本号/上架状态 | 否 | revision + 1，写历史 `meta` 快照 |
+| 换封面、增删截图 | 是 | revision + 1，写历史 `media` 快照，`project.cover/screenshots` 指向新版本 |
+| 改密码 | 否 | 不写 catalog |
+
+图片更新复用发布事务的同一套约束：
+
+1. 拿数据锁（`DATA_DIR/.publish.lock`，轮询 250 ms，30 秒超时）；
+2. 把当前版本目录整份复制到 `staging/media-<slug>-<rand>`；
+3. 在副本里替换 `media/`，重写 `release.json`，其余文件（`web/`、`downloads/`）原样保留；
+4. 整体 `rename` 到 `projects/<slug>/releases/<新 releaseId>`（同一文件系统内原子）；
+5. 校验新 catalog → 写历史 → 原子替换 catalog。
+
+因为 URL 里带版本号（`/media/<slug>/r/<releaseId>/<file>`），旧版本的图片地址永远有效，
+管理页换图不会让已经发出去的分享链接、缓存或历史版本失效。
+
+图片只按**魔数**判断类型，只接受 PNG / JPEG / WebP，单张上限 12 MiB，每个项目最多 12 张截图。
+`alt` 为空时用「标题 + 序号」兜底，避免出现没有描述的无障碍图片。

@@ -30,7 +30,7 @@ npm run typecheck       → 无错误（strict + noUnusedLocals + noUnusedParame
 不是可执行程序。
 
 ```
-共 36 项检查：通过 36，失败 0
+共 48 项检查：通过 48，失败 0
 ```
 
 | 分组 | 检查项 |
@@ -45,7 +45,7 @@ npm run typecheck       → 无错误（strict + noUnusedLocals + noUnusedParame
 真实 Edge 渲染 + 真实键鼠事件。
 
 ```
-浏览器检查 20 项：通过 20，失败 0
+浏览器检查 25 项：通过 25，失败 0
 ```
 
 | 场景 | 检查项 |
@@ -80,7 +80,7 @@ HTTP 冒烟              → / 200、/api/projects 200、/play/paper-notes 308�
                           Content-Length: 3563
 Range bytes=0-15       → 206，16 字节
 SHA-256 对比           → 下载内容哈希与 catalog 记录一致
-自测套件               → 共 36 项：通过 36，失败 0
+自测套件               → 共 48 项：通过 48，失败 0
 ```
 
 结论：Linux 上安装、构建、发布、运行、下载协议都可用，且**没有复用 Windows 的
@@ -107,7 +107,7 @@ SHA-256 对比           → 下载内容哈希与 catalog 记录一致
 | Range | `bytes=0-15` → 206，16 字节 |
 | `/play/paper-notes/` | 302 → `/play/paper-notes/r/r-20261018t130216z-50b640/`，跟随后 200 |
 | 下载内容哈希 | 与 `catalog.json` 记录完全一致 |
-| 服务器上跑自测 | 「共 36 项检查：通过 36，失败 0」 |
+| 服务器上跑自测 | 「共 48 项检查：通过 48，失败 0」 |
 | 重启 | `systemctl restart` 后 `/healthz` 正常，`catalogRevision` 不变 |
 | 日志 | `journalctl -u fennec-share` 只有启动与优雅关闭，无 ERROR / WARN |
 | 持续运行复核 | 部署约 5 分钟后再次只读核对：`is-active` = active，PID 与启动时间未变、uptime 连贯（没有崩溃重拉），`healthz` 仍 revision 5 / 5 个项目 |
@@ -129,7 +129,7 @@ SHA-256 对比           → 下载内容哈希与 catalog 记录一致
 | 占位地址 | `fennec-launcher`、`momo-reader` 的 `/play` 均 404 |
 | 服务 | `ActiveEnterTimestamp` 全程未变（21:11:54），发布没有触发重启 |
 
-本地同样跑了一遍数据驱动的浏览器验收：**20 项全过**（界面弹窗、筛选、移动端、异常状态、真实下载）。
+本地同样跑了一遍数据驱动的浏览器验收：**25 项全过**（界面弹窗、筛选、移动端、异常状态、真实下载、分享链接、管理页面）。
 数量断言改成从 `/api/projects` 推导，换内容不用改测试。
 
 **域名尚未映射**：`share.fennecmomo.top` 目前没有 DNS 记录，隧道里也没有对应 ingress。
@@ -138,7 +138,26 @@ SHA-256 对比           → 下载内容哈希与 catalog 记录一致
 Cloudflare Zero Trust → Tunnels → `personal` → Public Hostname 新增
 `share.fennecmomo.top` → `http://localhost:8770`，DNS 由面板自动创建。
 
-## 七、没有验证 / 明确不支持的部分
+
+## 七、分享链接与管理后台（2026-10-18 本地验证）
+
+| 检查 | 结果 |
+| --- | --- |
+| 分享按钮 | 点击后不打开详情，剪贴板里是 `http(s)://<host>/?p=<slug>`，按钮切成「已复制」并弹出提示 |
+| 分享链接打开 | 带 `?p=<slug>` 打开首页会自动弹出对应项目；`Esc` 关闭后地址栏参数被清掉，刷新不再弹 |
+| 管理页面 | `/admin` 返回 200，带 CSP、`no-store`、`X-Robots-Tag: noindex` |
+| 登录 | 错误密码 401；正确密码 200 并下发 `HttpOnly; SameSite=Strict` cookie；未登录读接口 401 |
+| 防跨站 | 缺 `x-fennec-admin` 头的写请求 403；`Origin` 与 `Host` 不一致 403 |
+| 元信息编辑 | 标题/排序/版本号写入 catalog，revision +1，且**不产生新版本目录** |
+| 封面替换 | 生成新 release，旧 release 目录保留；新封面 200 `image/png` 且字节与上传内容一致；`web` 记录不变 |
+| 非图片上传 | 把 SVG 冒充 `image/png` 上传 → 415，catalog 不变 |
+| 截图增删 | 追加后数量 +1、`alt` 正确；删除后数量 -1；越界序号 400 |
+| 改密码 | 旧密码失效、新密码可用、其它会话被踢、当前会话保留；弱密码 400 |
+
+集成自测扩到 **48 项**（新增管理接口 13 项），浏览器验收扩到 **25 项**（新增分享 2 项、管理页面 3 项），
+全部通过。管理页面的浏览器用例只在设置了 `ADMIN_PASSWORD` 环境变量时运行，仓库里不存密码。
+
+## 八、没有验证 / 明确不支持的部分
 
 | 项 | 说明 |
 | --- | --- |
